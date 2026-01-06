@@ -14,17 +14,17 @@ fi
 
 if [[ "$_java" ]]; then
     version=$(javap -verbose java.lang.String | grep "major version" | cut -d " " -f5)
-    if [[ "$version" < "69" ]]; then
+    if [[ "$version" -lt "69" ]]; then
         echo Error: JDK version is less than 25
         exit
     fi
 fi
 
 mkdir build
-cd build
+cd build || exit
 
 mkdir helloworld
-cd helloworld
+cd helloworld || exit
 echo \
 'public class HelloWorld {
 
@@ -57,11 +57,11 @@ cp -R lib HelloMobileApp/HelloMobileApp
 
 xcodegen generate --spec=$root/HelloMobileApp/project.xml --project=$root/HelloMobileApp
 
-cd HelloMobileApp
-xcodebuild CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO DSTROOT=$root/Release archive
+cd HelloMobileApp || exit
+xcodebuild DSTROOT=$root/Release archive
 if [[ $? != 0 ]]; then
     echo "Xcode build failed"
-    exit -1
+    exit 1
 fi
 cd ..
 

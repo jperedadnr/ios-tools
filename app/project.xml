@@ -1,6 +1,6 @@
 name: HelloMobileApp
 options:
-  bundleIdPrefix: com.example.helloworld
+  bundleIdPrefix: com.gluonhq.helloworld
 targets:
   HelloMobileApp:
     type: application
@@ -28,6 +28,6 @@ targets:
         OTHER_LDFLAGS: -lc++
         DEVELOPMENT_TEAM: GET_DEVELOPMENT_TEAM
         GENERATE_INFOPLIST_FILE: Yes
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.helloworld.HelloMobileApp
+        PRODUCT_BUNDLE_IDENTIFIER: com.gluonhq.helloworld.HelloMobileApp
         ENABLE_DEBUG_DYLIB: No
 

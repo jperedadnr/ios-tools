@@ -27,10 +27,24 @@ jobs:
           java-version: '25'
           distribution: 'temurin'
 
+      - uses: Apple-Actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.GLUON_IOS_CERTIFICATES_FILE_BASE64 }}
+          p12-password: ${{ secrets.GLUON_IOS_CERTIFICATES_PASSWORD }}
+
+      - uses: Apple-Actions/download-provisioning-profiles@v4
+        with:
+          bundle-id: com.gluonhq.helloworld.HelloMobileApp
+          issuer-id: ${{ secrets.GLUON_IOS_APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.GLUON_IOS_APPSTORE_KEY_ID }}
+          api-private-key: ${{ secrets.GLUON_IOS_APPSTORE_PRIVATE_KEY }}
+
       - name: Run build script
         run: |
           cd app
           ./script.sh
+        env:
+          DEVELOPMENT_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
 
       - name: Upload iOS Artifact
         uses: actions/upload-artifact@v4
