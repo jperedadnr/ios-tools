@@ -59,6 +59,7 @@ cp lib/java_bundle-device/lib/modules HelloMobileApp/HelloMobileApp/lib/lib/
 
 xcodegen generate --spec=$root/HelloMobileApp/project.xml --project=$root/HelloMobileApp
 
+echo "Archive project"
 cd HelloMobileApp || exit
 xcodebuild -project HelloMobileApp.xcodeproj -scheme HelloMobileApp -archivePath $root/Release/HelloMobileApp.xcarchive -configuration Release -destination 'generic/platform=iOS' archive
 if [[ $? != 0 ]]; then
@@ -72,11 +73,12 @@ if [[ ! -d "$root/Release/HelloMobileApp.xcarchive" ]]; then
 fi
 sed -i '' "s/GET_DEVELOPMENT_TEAM/$DEVELOPMENT_TEAM/g" "$root/../exportOptions.plist"
 
-mkdir private_keys
-echo "$API_PRIVATE_KEY" >> "private_keys/AuthKey_$API_KEY_ID.p8"
-ls -l
+mkdir -p "$root/HelloMobileApp/private_keys"
+echo "$API_PRIVATE_KEY" >> "$root/HelloMobileApp/private_keys/AuthKey_$API_KEY_ID.p8"
+ls -l "$root/HelloMobileApp/private_keys"
 
-xcodebuild -exportArchive -archivePath "$root/Release/HelloMobileApp.xcarchive" -exportPath "$root/Release/Archives/HelloMobileApp.ipa" -exportOptionsPlist "$root/../exportOptions.plist" -authenticationKeyID "$API_KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID" -authenticationKeyPath private_keys
+echo "Export and upload ipa"
+xcodebuild -exportArchive -archivePath "$root/Release/HelloMobileApp.xcarchive" -exportPath "$root/Release/Archives/HelloMobileApp.ipa" -exportOptionsPlist "$root/../exportOptions.plist" -authenticationKeyID "$API_KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID" -authenticationKeyPath "$root/HelloMobileApp/private_keys/AuthKey_$API_KEY_ID.p8"
 if [[ $? != 0 ]]; then
     echo "Xcode build upload failed"
     exit 1
