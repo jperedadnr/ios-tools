@@ -34,7 +34,7 @@ jobs:
           git checkout master
           
           # temporary patch
-          git apply .github/patches/44.diff
+          git apply ../.github/patches/44.diff
           
           bash configure \
             --with-conf-name=macos-aarch64 \
