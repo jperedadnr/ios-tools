@@ -41,28 +41,34 @@ mkdir -p HelloMobileApp/HelloMobileApp
 cp -R ../source/*.* HelloMobileApp/HelloMobileApp
 cp ../project.xml HelloMobileApp/project.xml
 sed -i '' "s/GET_DEVELOPMENT_TEAM/$DEVELOPMENT_TEAM/g" HelloMobileApp/project.xml
+sed -i '' "s/GET_CURRENT_VERSION/$CURRENT_VERSION/g" HelloMobileApp/project.xml
 cp helloworld/HelloWorld.jar HelloMobileApp/HelloMobileApp
 
 mkdir framework
-wget -nv -O framework/OpenJDK.xcframework.zip https://github.com/openjdk-mobile/ios-tools/releases/download/snapshot/OpenJDK.xcframework.zip
+wget -nv -O framework/OpenJDK.xcframework.zip https://github.com/jperedadnr/ios-tools/releases/download/snapshot/OpenJDK.xcframework.zip
 unzip -q framework/OpenJDK.xcframework.zip -d framework
 rm framework/OpenJDK.xcframework.zip
 cp -R framework/OpenJDK.xcframework HelloMobileApp/HelloMobileApp
 
-mkdir -p lib/modules
-wget -nv -O lib/java.base-device.zip https://github.com/openjdk-mobile/ios-tools/releases/download/snapshot/java.base-device.zip
-unzip -q lib/java.base-device.zip -d lib/modules
-rm lib/java.base-device.zip
-cp -R lib HelloMobileApp/HelloMobileApp
+mkdir -p lib
+mkdir -p HelloMobileApp/HelloMobileApp/lib/lib
+wget -nv -O lib/java_bundle-device.zip https://github.com/jperedadnr/ios-tools/releases/download/snapshot/java_bundle-device.zip
+unzip -q lib/java_bundle-device.zip -d lib
+rm lib/java_bundle-device.zip
+cp lib/java_bundle-device/lib/modules HelloMobileApp/HelloMobileApp/lib/lib/
 
 xcodegen generate --spec=$root/HelloMobileApp/project.xml --project=$root/HelloMobileApp
 
 cd HelloMobileApp || exit
-xcodebuild DSTROOT=$root/Release archive
+xcodebuild -project HelloMobileApp.xcodeproj -scheme HelloMobileApp -archivePath $root/Release/HelloMobileApp.xcarchive -configuration Release archive
 if [[ $? != 0 ]]; then
-    echo "Xcode build failed"
+    echo "Xcode build archive failed"
     exit 1
 fi
-cd ..
 
-cd ..
+xcodebuild -exportArchive -archivePath "$root/Release/HelloMobileApp.xcarchive" -exportPath "$root/Release/Archives/HelloMobileApp.ipa" -exportOptionsPlist "$root/../exportOptions.plist"
+if [[ $? != 0 ]]; then
+    echo "Xcode build export failed"
+    exit 1
+fi
+cd ../..

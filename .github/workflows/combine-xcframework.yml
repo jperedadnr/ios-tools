@@ -89,7 +89,6 @@ jobs:
       - name: Upload XCFramework and modules jimage
         uses: actions/upload-artifact@v4
         with:
-          name: OpenJDK.xcframework
           path: |
             ./OpenJDK.xcframework
             ./java_bundle-device

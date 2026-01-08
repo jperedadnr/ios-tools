@@ -45,9 +45,17 @@ jobs:
           ./script.sh
         env:
           DEVELOPMENT_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
+          CURRENT_VERSION: ${env.GITHUB_RUN_NUMBER}
 
-      - name: Upload iOS Artifact
+      - name: Upload iOS IPA
         uses: actions/upload-artifact@v4
         with:
           name: helloMobileApp
-          path: app/build/Release/Applications
+          path: app/build/Release/Archives/HelloMobileApp.ipa
+
+      - uses: Apple-Actions/upload-testflight-build@v3
+        with:
+          app-path: app/build/Release/Archives/HelloMobileApp.ipa/HelloMobileApp.ipa
+          issuer-id: ${{ secrets.GLUON_IOS_APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.GLUON_IOS_APPSTORE_KEY_ID }}
+          api-private-key: ${{ secrets.GLUON_IOS_APPSTORE_PRIVATE_KEY }}

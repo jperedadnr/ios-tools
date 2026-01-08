@@ -1,7 +1,10 @@
 #import <Foundation/Foundation.h>
+#import "AppDelegate.h"
 #include "jni.h"
 #include <stdio.h>
+
 extern void loadfunctions();
+
 int main(int argc, char *argv[]) {
     JavaVM *jvm;
     JNIEnv *env;
@@ -37,5 +40,10 @@ int main(int argc, char *argv[]) {
     }
     (*env)->CallStaticVoidMethod(env, cls, mid, NULL);
     (*jvm)->DestroyJavaVM(jvm);
-    return 0;
+
+    NSString * appDelegateClassName;
+    @autoreleasepool {
+        appDelegateClassName = NSStringFromClass([AppDelegate class]);
+    }
+    return UIApplicationMain(argc, argv, nil, appDelegateClassName);
 }
