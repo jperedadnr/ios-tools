@@ -59,8 +59,6 @@ cp lib/java_bundle-device/lib/modules HelloMobileApp/HelloMobileApp/lib/lib/
 
 xcodegen generate --spec=$root/HelloMobileApp/project.xml --project=$root/HelloMobileApp
 
-security find-identity -p codesigning -v
-
 cd HelloMobileApp || exit
 xcodebuild -project HelloMobileApp.xcodeproj -scheme HelloMobileApp -archivePath $root/Release/HelloMobileApp.xcarchive -configuration Release -destination 'generic/platform=iOS' archive
 if [[ $? != 0 ]]; then
@@ -68,7 +66,13 @@ if [[ $? != 0 ]]; then
     exit 1
 fi
 
-xcodebuild -exportArchive -archivePath "$root/Release/HelloMobileApp.xcarchive" -exportPath "$root/Release/Archives/HelloMobileApp.ipa" -exportOptionsPlist "$root/../exportOptions.plist"
+if [[ ! -d "$root/Release/HelloMobileApp.xcarchive" ]]; then
+    echo "$root/Release/HelloMobileApp.xcarchive doesn't exist"
+    exit 1
+fi
+sed -i '' "s/GET_DEVELOPMENT_TEAM/$DEVELOPMENT_TEAM/g" "$root/../exportOptions.plist"
+
+xcodebuild -exportArchive -archivePath "$root/Release/HelloMobileApp.xcarchive" -exportPath "$root/Release/Archives/HelloMobileApp.ipa" -exportOptionsPlist "$root/../exportOptions.plist" -verbose
 if [[ $? != 0 ]]; then
     echo "Xcode build export failed"
     exit 1

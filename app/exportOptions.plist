@@ -2,7 +2,7 @@
 <plist version="1.0">
 <dict>
   <key>teamID</key>
-  <string>$DEVELOPMENT_TEAM</string>
+  <string>GET_DEVELOPMENT_TEAM</string>
   <key>method</key>
   <string>app-store-connect</string>
   <key>destination</key>
