@@ -72,9 +72,13 @@ if [[ ! -d "$root/Release/HelloMobileApp.xcarchive" ]]; then
 fi
 sed -i '' "s/GET_DEVELOPMENT_TEAM/$DEVELOPMENT_TEAM/g" "$root/../exportOptions.plist"
 
-xcodebuild -exportArchive -archivePath "$root/Release/HelloMobileApp.xcarchive" -exportPath "$root/Release/Archives/HelloMobileApp.ipa" -exportOptionsPlist "$root/../exportOptions.plist" -verbose
+mkdir private_keys
+echo "$API_PRIVATE_KEY" >> "private_keys/AuthKey_$API_KEY_ID.p8"
+ls -l
+
+xcodebuild -exportArchive -archivePath "$root/Release/HelloMobileApp.xcarchive" -exportPath "$root/Release/Archives/HelloMobileApp.ipa" -exportOptionsPlist "$root/../exportOptions.plist" -authenticationKeyID "$API_KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID" -authenticationKeyPath private_keys
 if [[ $? != 0 ]]; then
-    echo "Xcode build export failed"
+    echo "Xcode build upload failed"
     exit 1
 fi
 cd ../..
