@@ -45,7 +45,7 @@ jobs:
           ./script.sh
         env:
           DEVELOPMENT_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
-          CURRENT_VERSION: ${env.GITHUB_RUN_NUMBER}
+          CURRENT_VERSION: ${{ github.run_number }}
           ISSUER_ID: ${{ secrets.GLUON_IOS_APPSTORE_ISSUER_ID }}
           API_KEY_ID: ${{ secrets.GLUON_IOS_APPSTORE_KEY_ID }}
           API_PRIVATE_KEY: ${{ secrets.GLUON_IOS_APPSTORE_PRIVATE_KEY }}
