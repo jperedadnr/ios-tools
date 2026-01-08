@@ -6,7 +6,7 @@
   <key>method</key>
   <string>app-store-connect</string>
   <key>destination</key>
-  <string>export</string>
+  <string>upload</string>
   <key>manageAppVersionAndBuildNumber</key>
   <true/>
   <key>uploadBitcode</key>

@@ -51,11 +51,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: helloMobileApp
-          path: app/build/Release/Archives/HelloMobileApp.ipa
-
-      - uses: Apple-Actions/upload-testflight-build@v3
-        with:
-          app-path: app/build/Release/Archives/HelloMobileApp.ipa/HelloMobileApp.ipa
-          issuer-id: ${{ secrets.GLUON_IOS_APPSTORE_ISSUER_ID }}
-          api-key-id: ${{ secrets.GLUON_IOS_APPSTORE_KEY_ID }}
-          api-private-key: ${{ secrets.GLUON_IOS_APPSTORE_PRIVATE_KEY }}
+          path: app/build/Release/HelloMobileApp.xcarchive
