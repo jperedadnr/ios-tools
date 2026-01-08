@@ -59,8 +59,10 @@ cp lib/java_bundle-device/lib/modules HelloMobileApp/HelloMobileApp/lib/lib/
 
 xcodegen generate --spec=$root/HelloMobileApp/project.xml --project=$root/HelloMobileApp
 
+security find-identity -p codesigning -v
+
 cd HelloMobileApp || exit
-xcodebuild -project HelloMobileApp.xcodeproj -scheme HelloMobileApp -archivePath $root/Release/HelloMobileApp.xcarchive -configuration Release archive
+xcodebuild -project HelloMobileApp.xcodeproj -scheme HelloMobileApp -archivePath $root/Release/HelloMobileApp.xcarchive -configuration Release -destination 'generic/platform=iOS' archive
 if [[ $? != 0 ]]; then
     echo "Xcode build archive failed"
     exit 1
