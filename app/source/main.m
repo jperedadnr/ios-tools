@@ -3,9 +3,15 @@
 #include "jni.h"
 #include <stdio.h>
 
-extern void loadfunctions();
+extern void loadfunctions(void);
 
 int main(int argc, char *argv[]) {
+
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,NSUserDomainMask, YES);
+    NSString *documentsDirectory = [paths objectAtIndex:0];
+    NSString *logFilePath = [documentsDirectory stringByAppendingPathComponent:@"output.log"];
+    freopen([logFilePath cStringUsingEncoding:NSASCIIStringEncoding],"w+",stdout);
+
     JavaVM *jvm;
     JNIEnv *env;
     JavaVMInitArgs vm_args;
@@ -38,7 +44,9 @@ int main(int argc, char *argv[]) {
         printf("Could not find main method\n");
         return 1;
     }
+    fprintf(stderr, "Run main\n");
     (*env)->CallStaticVoidMethod(env, cls, mid, NULL);
+    fprintf(stderr, "Done JavaVM\n");
     (*jvm)->DestroyJavaVM(jvm);
 
     NSString * appDelegateClassName;
