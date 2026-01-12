@@ -7,10 +7,10 @@ extern void loadfunctions(void);
 
 int main(int argc, char *argv[]) {
 
-//     NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-//     NSString *documentsDirectory = [paths objectAtIndex:0];
-//     NSString *logFilePath = [documentsDirectory stringByAppendingPathComponent:@"output.log"];
-//     freopen([logFilePath cStringUsingEncoding:NSASCIIStringEncoding], "w+", stdout);
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    NSString *documentsDirectory = [paths objectAtIndex:0];
+    NSString *logFilePath = [documentsDirectory stringByAppendingPathComponent:@"output.log"];
+    freopen([logFilePath cStringUsingEncoding:NSASCIIStringEncoding], "w+", stdout);
 
     JavaVM *jvm;
     JNIEnv *env;
