@@ -7,10 +7,10 @@ extern void loadfunctions(void);
 
 int main(int argc, char *argv[]) {
 
-    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,NSUserDomainMask, YES);
-    NSString *documentsDirectory = [paths objectAtIndex:0];
-    NSString *logFilePath = [documentsDirectory stringByAppendingPathComponent:@"output.log"];
-    freopen([logFilePath cStringUsingEncoding:NSASCIIStringEncoding],"w+",stdout);
+//     NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+//     NSString *documentsDirectory = [paths objectAtIndex:0];
+//     NSString *logFilePath = [documentsDirectory stringByAppendingPathComponent:@"output.log"];
+//     freopen([logFilePath cStringUsingEncoding:NSASCIIStringEncoding], "w+", stdout);
 
     JavaVM *jvm;
     JNIEnv *env;
@@ -30,16 +30,16 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Create JavaVM\n");
     jint res = JNI_CreateJavaVM(&jvm, (void **)&env, &vm_args);
     if (res != JNI_OK) {
-        fprintf(stdout, "Failed to create JVM\n");
+        fprintf(stderr, "Failed to create JVM\n");
     } else {
         fprintf(stderr, "Created JavaVM\n");
         jclass cls = (*env)->FindClass(env, "HelloWorld");
         if (cls == NULL) {
-            fprintf(stdout, "Could not find HelloWorld class\n");
+            fprintf(stderr, "Could not find HelloWorld class\n");
         } else {
             jmethodID mid = (*env)->GetStaticMethodID(env, cls, "main", "([Ljava/lang/String;)V");
             if (mid == NULL) {
-                fprintf(stdout, "Could not find main method\n");
+                fprintf(stderr, "Could not find main method\n");
             } else {
                 fprintf(stderr, "Run main\n");
                 (*env)->CallStaticVoidMethod(env, cls, mid, NULL);

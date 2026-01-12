@@ -16,7 +16,7 @@
     label.textAlignment = NSTextAlignmentCenter;
     [self.view addSubview:label];
 
-    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,NSUserDomainMask, YES);
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
     NSString *documentsDirectory = [paths objectAtIndex:0];
     NSString *logFilePath = [documentsDirectory stringByAppendingPathComponent:@"output.log"];
     NSError *error;
