@@ -41,7 +41,7 @@ jobs:
           
           mkdir jmods-device
           ./macos-jdk/bin/jmod create --class-path ./java.base-device/java.base --target-platform ios-aarch64 jmods-device/java.base.jmod
-          ./macos-jdk/bin/jlink --module-path ./jmods --add-modules java.base --output java_bundle-device
+          ./macos-jdk/bin/jlink --module-path ./jmods-device --add-modules java.base --output java_bundle-device
 
       - name: Download java.base for simulator
         uses: actions/download-artifact@v4
@@ -53,7 +53,7 @@ jobs:
         run: |
           mkdir jmods-simulator
           ./macos-jdk/bin/jmod create --class-path ./java.base-simulator/java.base --target-platform ios-aarch64 jmods-simulator/java.base.jmod
-          ./macos-jdk/bin/jlink --module-path ./jmods --add-modules java.base --output java_bundle-simulator
+          ./macos-jdk/bin/jlink --module-path ./jmods-simulator --add-modules java.base --output java_bundle-simulator
 
       - name: Download and unzip mobile-support
         env:
