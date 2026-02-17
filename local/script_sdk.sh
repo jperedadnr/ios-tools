@@ -48,9 +48,6 @@ fi
 
 if [[ ! -d "jfx" ]]; then
   git clone --depth 1 https://github.com/openjdk/jfx.git
-  cd jfx || exit
-  sh gradlew shadersClasses
-  cd ..
 fi
 jfxversion=$(grep "^[#]*\s*jfx.release.major.version" jfx/build.properties | cut -d'=' -f2)$(grep "^[#]*\s*jfx.release.suffix=" jfx/build.properties | cut -d'=' -f2)
 if [[ -z "$jfxversion" ]]; then
@@ -63,7 +60,11 @@ if [[ ! -d "mobile" ]]; then
   git clone --depth 1 https://github.com/openjdk/mobile/
   cd mobile || exit
   patch -p1 < ../openjfx-build/openjdk-ext/src/jfx.patch
-  git apply "$root/../../.github/patches/debug-ios-patch.diff"
+
+  # Copy custom javafx.graphics makefiles
+  cp "$root/../../openjdk-ext/src/javafx.graphics"/*.gmk make/modules/javafx.graphics/
+  # copy antlr tool for gensrc
+  cp -r "$root/../../openjdk-ext/src/make/data/javafx-tools" make/data
   cd ..
 fi
 
@@ -73,9 +74,14 @@ if [[ ! -f "$root/mobile/build/jfx/images/jdk/bin/jmod" ]];  then
   bash configure \
               --with-conf-name=jfx \
               --with-openjfx-modules=../jfx \
-              --with-boot-jdk=$JAVA_HOME \
+              --with-boot-jdk="$JAVA_HOME" \
               --disable-warnings-as-errors
   make CONF=jfx images
+fi
+
+if [[ "$(uname)" != "Darwin" ]]; then
+  echo "iOS builds are intended to be run on macOS. Exiting."
+  exit
 fi
 
 if [[ ! -d "$root/mobile/build/ios-aarch64-zero-release/images/static-libs/lib" ]];  then

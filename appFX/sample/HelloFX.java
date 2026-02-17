@@ -38,6 +38,7 @@ public class HelloFX extends Application {
 
     public static void main(String[] args) {
         System.out.println("Hello JavaFX: " + System.getProperty("os.name") + ":" + System.getProperty("os.arch"));
+        System.setProperty("prism.verbose", "true");
         try { launch(args); } catch (Throwable t) { t.printStackTrace(); }
     }
 }

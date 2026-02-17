@@ -1,0 +1,23 @@
+DISABLED_WARNINGS_java := try deprecation rawtypes unchecked serial cast removal preview restricted dangling-doc-comments overloads module this-escape \
+                          lossy-conversions static auxiliaryclass exports fallthrough
+
+# Patch the module with ANTLR runtime for compiling ANTLR-generated parser code
+JAVAC_FLAGS += -encoding UTF-8 --patch-module javafx.graphics="$(TOPDIR)/make/data/javafx-tools/antlr-4.13.2-complete.jar"
+
+COPY += .gif .png .wav .txt .xml .css .frag .obj .properties .metallib
+
+# Main module sources (always included)
+SRC += $(OPENJFX_MODULES_SRC)/modules/javafx.graphics/src/main/java
+SRC += $(OPENJFX_MODULES_SRC)/modules/javafx.graphics/src/main/resources
+
+# Generated shader sources - only include if they exist
+# This allows core classes to compile first, then gensrc creates these, then full recompile
+GENSRC_SHADER_DIR := $(SUPPORT_OUTPUTDIR)/gensrc/javafx.graphics/com
+ifneq ($(wildcard $(GENSRC_SHADER_DIR)),)
+  SRC += $(GENSRC_SHADER_DIR)
+endif
+
+CLEAN_FILES += $(wildcard \
+    $(TOPDIR)/src/javafx.graphics/share/classes/com/sun/javafx/tk/quantum/*.properties)
+
+TARGETS += $(call CreateHkTargets, $(CLEAN_FILES))
