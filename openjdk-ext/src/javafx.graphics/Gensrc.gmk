@@ -151,10 +151,22 @@ $(DECORA_COMPILER_CLASSES_DIR)/_the.BUILD_DECORA_COMPILERS_batch: $(BUILD_JSLC_C
 
 DECORA_SHADER_MARKER := $(SUPPORT_OUTPUTDIR)/javafx-build/javafx.graphics/.decora_shaders.marker
 
+# Set pipeline options based on target OS
+DECORA_PIPELINE_OPTS :=
+ifeq ($(call isTargetOs, windows), true)
+  DECORA_PIPELINE_OPTS := -d3d
+else ifeq ($(call isTargetOs, macosx), true)
+  DECORA_PIPELINE_OPTS := -mtl -es2
+else ifeq ($(call isTargetOs, linux), true)
+  DECORA_PIPELINE_OPTS := -es2
+endif
+
 $(DECORA_SHADER_MARKER): $(BUILD_DECORA_COMPILERS)
 	$(call LogInfo, Generating Decora shaders)
 	$(call MakeDir, $(JSL_DECORA_TEMP_DIR))
+ifeq ($(call isTargetOs, macosx), true)
 	$(call MakeDir, $(MTL_HEADERS_DIR))
+endif
 	$(JAVA) --module-path "$(BASE_CORE_TEMP_DIR)$(PATH_SEP)$(GRAPHICS_CORE_TEMP_DIR)" \
 	    --add-modules=javafx.base,javafx.graphics \
 	    --add-exports=javafx.graphics/com.sun.scenario.effect=ALL-UNNAMED \
@@ -163,7 +175,7 @@ $(DECORA_SHADER_MARKER): $(BUILD_DECORA_COMPILERS)
 	    -cp "$(ANTLR_JAR)$(PATH_SEP)$(JSLC_CLASSES_DIR)$(PATH_SEP)$(GRAPHICS_MODULE_SRC)/src/jslc/resources$(PATH_SEP)$(DECORA_COMPILER_CLASSES_DIR)$(PATH_SEP)$(DECORA_COMPILER_SRC_DIR)" \
 	    -Dfile.encoding=UTF-8 \
 	    GenAllDecoraShaders -i $(DECORA_COMPILER_SRC_DIR) -o $(JSL_DECORA_TEMP_DIR) \
-	    -t -pkg com/sun/scenario/effect -all GenAllDecoraShaders
+	    -t -pkg com/sun/scenario/effect $(DECORA_PIPELINE_OPTS) -all GenAllDecoraShaders
 	$(TOUCH) $@
 
 ################################################################################
@@ -224,11 +236,23 @@ $(PRISM_COMPILER_CLASSES_DIR)/_the.BUILD_PRISM_COMPILERS_batch: $(BUILD_JSLC_COM
 PRISM_JSL_FILES := $(wildcard $(PRISM_COMPILER_SRC_DIR)/*.jsl)
 PRISM_SHADER_MARKER := $(SUPPORT_OUTPUTDIR)/javafx-build/javafx.graphics/.prism_shaders.marker
 
+# Set pipeline options based on target OS
+PRISM_PIPELINE_OPTS :=
+ifeq ($(call isTargetOs, windows), true)
+  PRISM_PIPELINE_OPTS := -d3d
+else ifeq ($(call isTargetOs, macosx), true)
+  PRISM_PIPELINE_OPTS := -mtl -es2
+else ifeq ($(call isTargetOs, linux), true)
+  PRISM_PIPELINE_OPTS := -es2
+endif
+
 # Use single target with for loop to serialize execution (prevents PrismShaderCommon.h corruption)
 $(PRISM_SHADER_MARKER): $(BUILD_PRISM_COMPILERS)
 	$(call LogInfo, Generating Prism shaders)
 	$(call MakeDir, $(JSL_PRISM_TEMP_DIR))
+ifeq ($(call isTargetOs, macosx), true)
 	$(call MakeDir, $(MTL_HEADERS_DIR))
+endif
 	@for FILE in $(PRISM_JSL_FILES); do \
 	  $(JAVA) --module-path "$(BASE_CORE_TEMP_DIR)$(PATH_SEP)$(GRAPHICS_CORE_TEMP_DIR)" \
 	      --add-modules=javafx.base,javafx.graphics \
@@ -238,7 +262,7 @@ $(PRISM_SHADER_MARKER): $(BUILD_PRISM_COMPILERS)
 	      -cp "$(ANTLR_JAR)$(PATH_SEP)$(JSLC_CLASSES_DIR)$(PATH_SEP)$(GRAPHICS_MODULE_SRC)/src/jslc/resources$(PATH_SEP)$(PRISM_COMPILER_CLASSES_DIR)$(PATH_SEP)$(PRISM_COMPILER_SRC_DIR)" \
 	      -Dfile.encoding=UTF-8 \
 	      CompileJSL -i $(PRISM_COMPILER_SRC_DIR) -o $(JSL_PRISM_TEMP_DIR) \
-	      -t -pkg com/sun/prism -d3d -es2 -mtl -name $$FILE; \
+	      -t -pkg com/sun/prism $(PRISM_PIPELINE_OPTS) -name $$FILE; \
 	done
 	$(TOUCH) $@
 
@@ -313,17 +337,13 @@ endif
 # Collect all targets
 ################################################################################
 
-# Create a marker file that indicates all headers are ready
-# This allows Lib.gmk to depend on headers being generated
-MTL_HEADERS_READY_MARKER := $(MTL_HEADERS_DIR)/.headers_ready
-
 ifeq ($(call isTargetOs, macosx), true)
+  # Create a marker file that indicates all headers are ready
+  # This allows build of libprism_mtl in Lib.gmk to depend on headers being generated
+  MTL_HEADERS_READY_MARKER := $(MTL_HEADERS_DIR)/.headers_ready
+
   # On macOS, headers marker depends on Decora MSL compilation (which creates DecoraShaderCommon.h)
   $(MTL_HEADERS_READY_MARKER): $(SHADER_FLATTEN_MARKER) $(PRISM_FLATTEN_MARKER) $(DECORA_MSL_MARKER)
-	$(TOUCH) $@
-else
-  # On other platforms, just depend on shader flatten markers
-  $(MTL_HEADERS_READY_MARKER): $(SHADER_FLATTEN_MARKER) $(PRISM_FLATTEN_MARKER)
 	$(TOUCH) $@
 endif
 
