@@ -45,7 +45,10 @@ For the local SDK build:
   - Run local/script_sdk.sh first to build the SDK
 
 Output:
-  build/Release/HelloFXMobileApp.xcarchive   - Archive for distribution
+  build/hellofx                               - HelloFX application
+  build/framework                             - iOS framework
+  build/HelloFXMobileApp                      - Xcode project
+  build/Release/HelloFXMobileApp.xcarchive    - Archive for distribution
   build/Release/Archives/HelloFXMobileApp.ipa - IPA file (if signed and uploaded)
 
 EOF

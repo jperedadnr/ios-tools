@@ -7,7 +7,7 @@ show_help() {
     cat << EOF
 Usage: ./script_sdk.sh [doSim]
 
-This scripts OpenJDK Mobile SDK with JavaFX, for desktop and for iOS.
+This scripts builds OpenJDK Mobile SDK with JavaFX for desktop, and also for iOS when running from macOS.
 
 Arguments:
   doSim   Build iOS simulator SDK in addition to device SDK (true/false)
@@ -42,6 +42,7 @@ Prerequisites:
 Output:
   sdk/libffi                                                        - Downloaded libffi for iOS device builds (macOS only)
   sdk/libffi-sim                                                    - Downloaded libffi for iOS simulator builds (macOS only)
+  sdk/openjdk-build                                                 - Clone of the OpenJDK-Mobile/openjfx-build repository
   sdk/jfx                                                           - Clone of the OpenJFX repository
   sdk/mobile                                                        - Clone of the OpenJDK Mobile repository
   sdk/mobile/build/jfx/images/jdk/                                  - Full JDK with JavaFX for desktop
@@ -52,7 +53,7 @@ Output:
   sdk/mobile/build/java_bundle/                                     - iOS module bundle (macOS only)
   sdk/device-static/libdevice.a                                     - Native library for the iOS framework (macOS only)
   sdk/simulator-static/libsimulator.a                               - Native library for the iOS framework (macOS only)
-  sdk/framework/OpenJDK.xcframework/                                - iOS framework (macOS only)
+  sdk/framework/OpenJDK.xcframework/                                - iOS framework for iOS and iOS simulator (macOS only)
 
 EOF
     exit 0

@@ -46,7 +46,10 @@ For the local SDK build:
   - Run local/script_sdk.sh first to build the SDK
 
 Output:
-  build/Release/HelloMobileApp.xcarchive   - Archive for distribution
+  build/hello                               - HelloWorld application
+  build/framework                           - iOS framework
+  build/HelloMobileApp                      - Xcode project
+  build/Release/HelloMobileApp.xcarchive    - Archive for distribution
   build/Release/Archives/HelloMobileApp.ipa - IPA file (if signed and uploaded)
 
 EOF
