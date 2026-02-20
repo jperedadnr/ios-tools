@@ -1,8 +1,3 @@
-#
-# Copyright (c) 2025, Oracle and/or its affiliates. All rights reserved.
-# DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-#
-
 include GensrcCommon.gmk
 include Execute.gmk
 
@@ -48,7 +43,8 @@ $(eval $(call SetupJavaCompilation, BUILD_BASE_CORE_TEMP, \
     SRC := $(OPENJFX_MODULES_SRC)/modules/javafx.base/src/main/java, \
     EXTRA_FILES := $(BASE_VERSION_INFO_GENSRC), \
     BIN := $(BASE_CORE_TEMP_DIR), \
-    DISABLED_WARNINGS := rawtypes unchecked deprecation removal preview missing-explicit-ctor serial overloads module this-escape, \
+    JAVAC_FLAGS := -source $(OLDEST_BOOT_JDK_VERSION) -target $(OLDEST_BOOT_JDK_VERSION), \
+    DISABLED_WARNINGS := rawtypes unchecked deprecation removal preview missing-explicit-ctor serial overloads module this-escape options, \
     DEPENDS := $(BASE_VERSION_INFO_GENSRC), \
 ))
 
@@ -57,8 +53,8 @@ $(eval $(call SetupJavaCompilation, BUILD_GRAPHICS_CORE_TEMP, \
     SMALL_JAVA := false, \
     SRC := $(GRAPHICS_MODULE_SRC)/src/main/java, \
     BIN := $(GRAPHICS_CORE_TEMP_DIR), \
-    JAVAC_FLAGS := --module-path $(BASE_CORE_TEMP_DIR) --add-modules=javafx.base, \
-    DISABLED_WARNINGS := rawtypes unchecked deprecation removal preview missing-explicit-ctor serial overloads module this-escape lossy-conversions auxiliaryclass dangling-doc-comments static restricted exports fallthrough, \
+    JAVAC_FLAGS := -source $(OLDEST_BOOT_JDK_VERSION) -target $(OLDEST_BOOT_JDK_VERSION) --module-path $(BASE_CORE_TEMP_DIR) --add-modules=javafx.base, \
+    DISABLED_WARNINGS := rawtypes unchecked deprecation removal preview missing-explicit-ctor serial overloads module this-escape lossy-conversions auxiliaryclass dangling-doc-comments static restricted exports fallthrough options, \
     DEPENDS := $(BUILD_BASE_CORE_TEMP), \
 ))
 
@@ -124,7 +120,8 @@ $(eval $(call SetupJavaCompilation, BUILD_JSLC_COMPILER, \
     EXTRA_FILES := $(ANTLR_GENERATED_FILES), \
     BIN := $(JSLC_CLASSES_DIR), \
     CLASSPATH := $(ANTLR_JAR), \
-    DISABLED_WARNINGS := rawtypes unchecked deprecation removal this-escape, \
+    JAVAC_FLAGS := -source $(OLDEST_BOOT_JDK_VERSION) -target $(OLDEST_BOOT_JDK_VERSION), \
+    DISABLED_WARNINGS := rawtypes unchecked deprecation removal this-escape options, \
 ))
 
 $(JSLC_CLASSES_DIR)/_the.BUILD_JSLC_COMPILER_batch: $(ANTLR_GENERATED_FILES)
@@ -141,7 +138,8 @@ $(eval $(call SetupJavaCompilation, BUILD_DECORA_COMPILERS, \
     SRC := $(DECORA_COMPILER_SRC_DIR), \
     BIN := $(DECORA_COMPILER_CLASSES_DIR), \
     CLASSPATH := $(JSLC_CLASSES_DIR)$(PATH_SEP)$(ANTLR_JAR)$(PATH_SEP)$(GRAPHICS_CORE_TEMP_DIR)$(PATH_SEP)$(BASE_CORE_TEMP_DIR), \
-    DISABLED_WARNINGS := rawtypes unchecked deprecation removal, \
+    JAVAC_FLAGS := -source $(OLDEST_BOOT_JDK_VERSION) -target $(OLDEST_BOOT_JDK_VERSION), \
+    DISABLED_WARNINGS := rawtypes unchecked deprecation removal options, \
     DEPENDS := $(BUILD_JSLC_COMPILER) $(BUILD_GRAPHICS_CORE_TEMP), \
 ))
 
@@ -183,10 +181,10 @@ $(SHADER_FLATTEN_MARKER): $(DECORA_SHADER_MARKER)
 	$(TOUCH) $@
 
 ################################################################################
-# Step 6: Compile Decora Metal shaders (macOS/iOS only)
+# Step 6: Compile Decora Metal shaders (macOS only)
 ################################################################################
 
-ifeq ($(call isTargetOs, macosx ios), true)
+ifeq ($(call isTargetOs, macosx), true)
   DECORA_MSL_MARKER := $(MSL_DECORA_DIR)/_decora_msl.marker
 
   $(DECORA_MSL_MARKER): $(SHADER_FLATTEN_MARKER)
@@ -212,7 +210,8 @@ $(eval $(call SetupJavaCompilation, BUILD_PRISM_COMPILERS, \
     SRC := $(PRISM_COMPILER_SRC_DIR), \
     BIN := $(PRISM_COMPILER_CLASSES_DIR), \
     CLASSPATH := $(JSLC_CLASSES_DIR)$(PATH_SEP)$(ANTLR_JAR)$(PATH_SEP)$(GRAPHICS_CORE_TEMP_DIR)$(PATH_SEP)$(BASE_CORE_TEMP_DIR), \
-    DISABLED_WARNINGS := rawtypes unchecked deprecation removal, \
+    JAVAC_FLAGS := -source $(OLDEST_BOOT_JDK_VERSION) -target $(OLDEST_BOOT_JDK_VERSION), \
+    DISABLED_WARNINGS := rawtypes unchecked deprecation removal options, \
     DEPENDS := $(BUILD_JSLC_COMPILER) $(BUILD_GRAPHICS_CORE_TEMP), \
 ))
 
@@ -251,10 +250,10 @@ $(PRISM_FLATTEN_MARKER): $(PRISM_SHADER_MARKER)
 	$(TOUCH) $@
 
 ################################################################################
-# Step 8: Compile Prism Metal shaders (macOS/iOS only)
+# Step 8: Compile Prism Metal shaders (macOS only)
 ################################################################################
 
-ifeq ($(call isTargetOs, macosx ios), true)
+ifeq ($(call isTargetOs, macosx), true)
   PRISM_MSL_MARKER := $(MSL_PRISM_DIR)/_prism_msl.marker
 
   $(PRISM_MSL_MARKER): $(PRISM_FLATTEN_MARKER)
@@ -270,10 +269,10 @@ ifeq ($(call isTargetOs, macosx ios), true)
 endif
 
 ################################################################################
-# Step 9: Compile and link native Metal shaders (macOS/iOS only)
+# Step 9: Compile and link native Metal shaders (macOS only)
 ################################################################################
 
-ifeq ($(call isTargetOs, macosx ios), true)
+ifeq ($(call isTargetOs, macosx), true)
   NATIVE_METAL_SRC_DIR := $(GRAPHICS_MODULE_SRC)/src/main/native-prism-mtl/msl
   NATIVE_MSL_MARKER := $(MSL_BUILD_DIR)/_native_msl.marker
 
@@ -300,7 +299,7 @@ endif
 # Step 10: Copy metallib to final location
 ################################################################################
 
-ifeq ($(call isTargetOs, macosx ios), true)
+ifeq ($(call isTargetOs, macosx), true)
   # Copy metallib to the proper package location in gensrc output
   METALLIB_GENSRC_OUTPUT := $(JSL_DECORA_GENSRC_DIR)/com/sun/prism/mtl/msl/jfxshaders.metallib
 
@@ -318,8 +317,8 @@ endif
 # This allows Lib.gmk to depend on headers being generated
 MTL_HEADERS_READY_MARKER := $(MTL_HEADERS_DIR)/.headers_ready
 
-ifeq ($(call isTargetOs, macosx ios), true)
-  # On macOS/iOS, headers marker depends on Decora MSL compilation (which creates DecoraShaderCommon.h)
+ifeq ($(call isTargetOs, macosx), true)
+  # On macOS, headers marker depends on Decora MSL compilation (which creates DecoraShaderCommon.h)
   $(MTL_HEADERS_READY_MARKER): $(SHADER_FLATTEN_MARKER) $(PRISM_FLATTEN_MARKER) $(DECORA_MSL_MARKER)
 	$(TOUCH) $@
 else
@@ -330,7 +329,6 @@ endif
 
 TARGETS := $(SHADER_FLATTEN_MARKER) $(PRISM_FLATTEN_MARKER) $(MTL_HEADERS_READY_MARKER)
 
-ifeq ($(call isTargetOs, macosx ios), true)
+ifeq ($(call isTargetOs, macosx), true)
   TARGETS += $(METALLIB_GENSRC_OUTPUT)
 endif
-
