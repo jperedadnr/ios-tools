@@ -188,13 +188,25 @@ endif
 # We DON'T delete the jsl-* dirs so incremental builds work - Java.gmk excludes them.
 SHADER_FLATTEN_MARKER := $(SUPPORT_OUTPUTDIR)/javafx-build/javafx.graphics/.shaders_flattened
 
+# Pre-declare HLSL markers so they are defined when referenced in flatten prerequisites below
+HLSL_DECORA_MARKER :=
+HLSL_PRISM_MARKER :=
+ifeq ($(call isTargetOs, windows), true)
+  HLSL_DECORA_MARKER := $(SUPPORT_OUTPUTDIR)/javafx-build/javafx.graphics/.decora_hlsl.marker
+  HLSL_PRISM_MARKER  := $(SUPPORT_OUTPUTDIR)/javafx-build/javafx.graphics/.prism_hlsl.marker
+endif
+
+ifeq ($(call isTargetOs, windows), true)
+$(SHADER_FLATTEN_MARKER): $(DECORA_SHADER_MARKER) $(HLSL_DECORA_MARKER)
+else
 $(SHADER_FLATTEN_MARKER): $(DECORA_SHADER_MARKER)
+endif
 	$(call LogInfo, Copying Decora shaders to gensrc output)
 	$(CP) -R $(JSL_DECORA_TEMP_DIR)/com $(JSL_DECORA_GENSRC_DIR)/
 	$(TOUCH) $@
 
 ################################################################################
-# Step 6: Compile Decora Metal shaders (macOS only)
+# Step 5a: Compile Decora Metal shaders (macOS only)
 ################################################################################
 
 ifeq ($(call isTargetOs, macosx), true)
@@ -207,6 +219,26 @@ ifeq ($(call isTargetOs, macosx), true)
 	  if [ -f "$$FILE" ]; then \
 	    BASE=$$(basename "$$FILE" .metal); \
 	    xcrun -sdk macosx metal -Wdeprecated -std=macos-metal2.4 -I $(MTL_HEADERS_DIR) -c "$$FILE" -o "$(MSL_DECORA_DIR)/$$BASE.air"; \
+	  fi; \
+	done
+	$(TOUCH) $@
+endif
+
+################################################################################
+# Step 5b: Compile Decora HLSL shaders (Windows only)
+################################################################################
+
+ifeq ($(call isTargetOs, windows), true)
+  HLSL_DECORA_DIR_OUT := $(JSL_DECORA_TEMP_DIR)/com/sun/scenario/effect/impl/hw/d3d/hlsl
+
+  # Use a recipe-level loop (same as Metal shaders) to avoid parse-time wildcard issues
+  $(HLSL_DECORA_MARKER): $(DECORA_SHADER_MARKER)
+	$(call LogInfo, Compiling Decora HLSL shaders)
+	$(call MakeDir, $(HLSL_DECORA_DIR_OUT))
+	for FILE in $(HLSL_DECORA_DIR_OUT)/*.hlsl; do \
+	  if [ -f "$$FILE" ]; then \
+	    BASE=$$(basename "$$FILE" .hlsl); \
+	    $(FXC) /nologo /T ps_3_0 /Fo "$(HLSL_DECORA_DIR_OUT)/$$BASE.obj" "$$FILE"; \
 	  fi; \
 	done
 	$(TOUCH) $@
@@ -273,13 +305,17 @@ endif
 
 PRISM_FLATTEN_MARKER := $(SUPPORT_OUTPUTDIR)/javafx-build/javafx.graphics/.prism_flattened
 
+ifeq ($(call isTargetOs, windows), true)
+$(PRISM_FLATTEN_MARKER): $(PRISM_SHADER_MARKER) $(HLSL_PRISM_MARKER)
+else
 $(PRISM_FLATTEN_MARKER): $(PRISM_SHADER_MARKER)
+endif
 	$(call LogInfo, Copying Prism shaders to gensrc output)
 	$(CP) -R $(JSL_PRISM_TEMP_DIR)/com $(JSL_PRISM_GENSRC_DIR)/
 	$(TOUCH) $@
 
 ################################################################################
-# Step 8: Compile Prism Metal shaders (macOS only)
+# Step 8a: Compile Prism Metal shaders (macOS only)
 ################################################################################
 
 ifeq ($(call isTargetOs, macosx), true)
@@ -292,6 +328,26 @@ ifeq ($(call isTargetOs, macosx), true)
 	  if [ -f "$$FILE" ]; then \
 	    BASE=$$(basename "$$FILE" .metal); \
 	    xcrun -sdk macosx metal -Wdeprecated -std=macos-metal2.4 -I $(MTL_HEADERS_DIR) -c "$$FILE" -o "$(MSL_PRISM_DIR)/$$BASE.air"; \
+	  fi; \
+	done
+	$(TOUCH) $@
+endif
+
+################################################################################
+# Step 8b: Compile Prism HLSL shaders (Windows only)
+################################################################################
+
+ifeq ($(call isTargetOs, windows), true)
+  HLSL_PRISM_DIR_OUT := $(JSL_PRISM_TEMP_DIR)/com/sun/prism/d3d/hlsl
+
+  # Use a recipe-level loop (same as Metal shaders) to avoid parse-time wildcard issues
+  $(HLSL_PRISM_MARKER): $(PRISM_SHADER_MARKER)
+	$(call LogInfo, Compiling Prism HLSL shaders)
+	$(call MakeDir, $(HLSL_PRISM_DIR_OUT))
+	for FILE in $(HLSL_PRISM_DIR_OUT)/*.hlsl; do \
+	  if [ -f "$$FILE" ]; then \
+	    BASE=$$(basename "$$FILE" .hlsl); \
+	    $(FXC) /nologo /T ps_3_0 /Fo "$(HLSL_PRISM_DIR_OUT)/$$BASE.obj" "$$FILE"; \
 	  fi; \
 	done
 	$(TOUCH) $@
@@ -357,3 +413,8 @@ TARGETS := $(SHADER_FLATTEN_MARKER) $(PRISM_FLATTEN_MARKER) $(MTL_HEADERS_READY_
 ifeq ($(call isTargetOs, macosx), true)
   TARGETS += $(METALLIB_GENSRC_OUTPUT)
 endif
+
+ifeq ($(call isTargetOs, windows), true)
+  TARGETS += $(HLSL_DECORA_MARKER) $(HLSL_PRISM_MARKER)
+endif
+
