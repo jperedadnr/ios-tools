@@ -1,0 +1,88 @@
+include MakeIncludeStart.gmk
+ifeq ($(INCLUDE), true)
+
+D3D_SHADER_SRC_DIR := $(OPENJFX_MODULES_SRC)/modules/javafx.graphics/src/main/native-prism-d3d
+D3D_SHADER_GEN_DIR := $(SUPPORT_OUTPUTDIR)/headers/javafx.graphics/prism_d3d
+
+D3D_SHADER_HEADERS := \
+    $(D3D_SHADER_GEN_DIR)/PassThroughVS.h \
+    $(D3D_SHADER_GEN_DIR)/hlsl/Mtl1VS_Obj.h
+
+$(D3D_SHADER_GEN_DIR)/PassThroughVS.h: $(D3D_SHADER_SRC_DIR)/PassThroughVS.hlsl
+	$(call LogInfo, Compiling passthrough shader $<)
+	$(call MakeDir, $(@D))
+	$(FXC) /nologo /T vs_3_0 /Fh $(@) /E passThrough $<
+
+$(D3D_SHADER_GEN_DIR)/hlsl/Mtl1VS_Obj.h: $(D3D_SHADER_SRC_DIR)/hlsl/Mtl1VS.hlsl
+	$(call LogInfo, Compiling vertex shader $<)
+	$(call MakeDir, $(@D))
+	$(FXC) /nologo /T vs_3_0 /Fh $(@) /DVertexType=VsInput $<
+
+D3D_PIXEL_SHADER_SRC := $(D3D_SHADER_SRC_DIR)/hlsl/Mtl1PS.hlsl
+
+# All pixel shader combinations
+D3D_PIXEL_SPEC_VALUES := 1 2 3
+D3D_PIXEL_STYPE_VALUES := 0 1 2 3
+D3D_PIXEL_STYPE_SUFFIXES := n t c m
+
+# Base pixel shader variants
+D3D_PIXEL_SHADER_VARIANTS := \
+    Mtl1PS|Spec=0|SType=0 \
+    Mtl1PS_i|Spec=0|SType=0|IllumMap=1
+
+# pixel shader variants without bump, without illumination
+$(foreach spec,$(D3D_PIXEL_SPEC_VALUES),\
+  $(foreach stype,$(D3D_PIXEL_STYPE_VALUES),\
+    $(eval D3D_PIXEL_SHADER_VARIANTS += Mtl1PS_s$(spec)$(word $(shell echo $$(($(stype)+1))),$(D3D_PIXEL_STYPE_SUFFIXES))|Spec=$(spec)|SType=$(stype))))
+
+# pixel shader variants with bump, without illumination
+$(foreach spec,$(D3D_PIXEL_SPEC_VALUES),\
+  $(foreach stype,$(D3D_PIXEL_STYPE_VALUES),\
+    $(eval D3D_PIXEL_SHADER_VARIANTS += Mtl1PS_b$(spec)$(word $(shell echo $$(($(stype)+1))),$(D3D_PIXEL_STYPE_SUFFIXES))|Spec=$(spec)|SType=$(stype)|Bump=1)))
+
+# pixel shader variants with illumination, without bump
+$(foreach spec,$(D3D_PIXEL_SPEC_VALUES),\
+  $(foreach stype,$(D3D_PIXEL_STYPE_VALUES),\
+    $(eval D3D_PIXEL_SHADER_VARIANTS += Mtl1PS_s$(spec)$(word $(shell echo $$(($(stype)+1))),$(D3D_PIXEL_STYPE_SUFFIXES))i|Spec=$(spec)|SType=$(stype)|IllumMap=1)))
+
+# pixel shader variants with bump and illumination
+$(foreach spec,$(D3D_PIXEL_SPEC_VALUES),\
+  $(foreach stype,$(D3D_PIXEL_STYPE_VALUES),\
+    $(eval D3D_PIXEL_SHADER_VARIANTS += Mtl1PS_b$(spec)$(word $(shell echo $$(($(stype)+1))),$(D3D_PIXEL_STYPE_SUFFIXES))i|Spec=$(spec)|SType=$(stype)|Bump=1|IllumMap=1)))
+
+# function to create pixel shader rule
+define CreatePixelShaderVariant
+  $(eval _NAME := $(word 1,$(subst |, ,$(1))))
+  $(eval _DEFS := $(subst |, ,$(wordlist 2,99,$(subst |, ,$(1)))))
+  $(eval _FLAGS := $(foreach def,$(_DEFS),/D$(def)))
+
+$(D3D_SHADER_GEN_DIR)/hlsl/$(_NAME).h: $(D3D_PIXEL_SHADER_SRC)
+	$$(call LogInfo, Compiling pixel shader $(_NAME).h)
+	$$(call MakeDir, $$(@D))
+	$$(FXC) /nologo /T ps_3_0 /Fh $$(@) $(_FLAGS) $$<
+
+  D3D_PIXEL_SHADER_HEADERS += $(D3D_SHADER_GEN_DIR)/hlsl/$(_NAME).h
+endef
+
+$(foreach var,$(D3D_PIXEL_SHADER_VARIANTS),$(eval $(call CreatePixelShaderVariant,$(var))))
+
+D3D_SHADER_HEADERS += $(D3D_PIXEL_SHADER_HEADERS)
+
+$(eval $(call SetupJdkLibrary, BUILD_LIBPRISM_D3D, \
+    NAME := prism_d3d, \
+    OPTIMIZATION := HIGH, \
+    EXTRA_HEADER_DIRS := $(D3D_SHADER_GEN_DIR), \
+    CFLAGS_windows := -EHsc -D_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR -DINLINE=__inline -DUNICODE -D_UNICODE -permissive -std:c++14, \
+    LIBS_windows := -manifest -dynamicbase -nxcompat user32.lib, \
+    SRC := $(OPENJFX_MODULES_SRC)/modules/javafx.graphics/src/main/native-prism-d3d, \
+    EXTRA_SRC := $(OPENJFX_MODULES_SRC)/modules/javafx.graphics/src/main/native-prism-d3d/hlsl, \
+))
+
+$(BUILD_LIBPRISM_D3D): $(D3D_SHADER_HEADERS)
+
+TARGETS += $(BUILD_LIBPRISM_D3D)
+
+################################################################################
+
+endif # include guard
+include MakeIncludeEnd.gmk

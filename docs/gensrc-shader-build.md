@@ -23,8 +23,8 @@ The shader generation process involves multiple stages:
 2. **Parser Generation**: Generate ANTLR parser for JSL grammar
 3. **Compiler Compilation**: Compile the shader compiler tools (JSLC, Decora, Prism)
 4. **Shader Generation**: Generate shader sources in multiple formats (GLSL, HLSL, Metal)
-5. **Native Compilation**: Compile Metal shaders to native .air and .metallib formats
-6. **Flattening**: Copy generated sources to final gensrc output directory
+5. **Native Compilation**: Compile Metal shaders to native .air and .metallib formats (macOS), or HLSL shaders to .obj files (Windows)
+6. **Flattening**: Copy generated sources (including .obj) to final gensrc output directory
 
 ### Key Challenge
 
@@ -34,13 +34,15 @@ The shader compilers need classes from javafx.graphics to compile, but javafx.gr
 
 The build system supports **Windows, macOS, and Linux**:
 
-- **Path Separators**: Automatically configured based on target OS
-  - Unix/Linux/macOS: `:` (colon)
-  - Windows: `;` (semicolon)
-- **Platform-Specific Shaders**: 
-  - Metal shaders (`.metal`) compiled only on macOS/iOS
-  - DirectX shaders (`.hlsl`) compiled only on Windows
+- **Path Separators**: Always use `:` (colon); `fixpath` converts to `;` on Windows when needed
+- **Platform-Specific Shaders**:
+  - Metal shaders (`.metal` → `.air` → `.metallib`) compiled only on macOS
+  - DirectX shaders (`.hlsl` → `.obj`) compiled only on Windows
   - OpenGL shaders (`.glsl`, `.frag`) compiled on all platforms
+
+### ANTLR Jar
+
+`antlr-4.13.2-complete.jar` is expected to be **pre-placed** at `make/data/javafx-tools/antlr-4.13.2-complete.jar` — it is **not downloaded** at build time. The script that clones/prepares the jfx repository is responsible for copying this jar from `openjdk-ext/src/make/data/javafx-tools/`.
 
 ---
 
@@ -48,33 +50,33 @@ The build system supports **Windows, macOS, and Linux**:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    JAVAFX GRAPHICS GENSRC PHASE                      │
+│                    JAVAFX GRAPHICS GENSRC PHASE                     │
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────────┐
 │ STEP 0: Compile Temp Core Classes                                    │
 ├──────────────────────────────────────────────────────────────────────┤
 │ VersionInfo.java                                                     │
-│       │                                                               │
-│       ▼                                                               │
-│ BUILD_BASE_CORE_TEMP ────────────► temp-modules/javafx.base/        │
+│       │                                                              │
+│       ▼                                                              │
+│ BUILD_BASE_CORE_TEMP ────────────► temp-modules/javafx.base/         │
 │  (311 classes)                      - javafx.beans.*                 │
 │                                     - javafx.collections.*           │
 │       │                             - com.sun.javafx.*               │
-│       ▼                                                               │
-│ BUILD_GRAPHICS_CORE_TEMP ──────► temp-modules/javafx.graphics/      │
-│  (1,563 classes)                    - com.sun.scenario.effect.*     │
+│       ▼                                                              │
+│ BUILD_GRAPHICS_CORE_TEMP ──────► temp-modules/javafx.graphics/       │
+│  (1,563 classes)                    - com.sun.scenario.effect.*      │
 │                                     - com.sun.javafx.*               │
 └──────────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│ STEP 1: Download ANTLR Parser Generator                              │
+│ STEP 1: Generate ANTLR Parser (ANTLR jar pre-placed)                 │
 ├──────────────────────────────────────────────────────────────────────┤
-│ Download antlr-4.13.2-complete.jar                                   │
-│       │                                                               │
-│       ▼                                                               │
-│ Generate parser from JSL.g4 grammar ──► antlr/*.java                │
+│ make/data/javafx-tools/antlr-4.13.2-complete.jar (pre-placed)        │
+│       │                                                              │
+│       ▼                                                              │
+│ Generate parser from JSL.g4 grammar ──► antlr/*.java                 │
 │  - JSLLexer.java                                                     │
 │  - JSLParser.java                                                    │
 │  - JSLListener.java                                                  │
@@ -88,9 +90,9 @@ The build system supports **Windows, macOS, and Linux**:
 │ STEP 2: Compile JSLC Compiler                                        │
 ├──────────────────────────────────────────────────────────────────────┤
 │ BUILD_JSLC_COMPILER                                                  │
-│  Input: src/jslc/java/*.java + antlr/*.java                         │
+│  Input: src/jslc/java/*.java + antlr/*.java                          │
 │  Output: classes/java/jslc/*.class                                   │
-│  Classpath: antlr-4.13.2-complete.jar                               │
+│  Classpath: antlr-4.13.2-complete.jar                                │
 └──────────────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -100,7 +102,7 @@ The build system supports **Windows, macOS, and Linux**:
 │ BUILD_DECORA_COMPILERS                                               │
 │  Input: src/main/jsl-decora/*.java                                   │
 │  Output: classes/jsl-compilers/decora/*.class                        │
-│  Classpath: JSLC + ANTLR + temp javafx.graphics (for Effect classes)│
+│  Classpath: JSLC + ANTLR + temp javafx.graphics (for Effect classes) │
 │  Dependencies: BUILD_JSLC_COMPILER, BUILD_GRAPHICS_CORE_TEMP         │
 └──────────────────────────────────────────────────────────────────────┘
                               │
@@ -108,138 +110,150 @@ The build system supports **Windows, macOS, and Linux**:
 ┌──────────────────────────────────────────────────────────────────────┐
 │ STEP 4: Generate Decora Shaders                                      │
 ├──────────────────────────────────────────────────────────────────────┤
-│ GenAllDecoraShaders (runs CompileBlend, CompilePhong, etc.)         │
+│ GenAllDecoraShaders (runs CompileBlend, CompilePhong, etc.)          │
 │  Input: src/main/jsl-decora/*.jsl                                    │
-│  Output: jsl-decora-temp/com/sun/scenario/effect/impl/              │
-│    ├─ sw/java/*.java          (Software renderer)                   │
+│  Output: jsl-decora-temp/com/sun/scenario/effect/impl/               │
+│    ├─ sw/java/*.java          (Software renderer)                    │
 │    ├─ sw/sse/*.java            (SSE optimized)                       │
 │    ├─ prism/ps/*.java          (Prism pipeline)                      │
-│    ├─ hw/d3d/hlsl/*.hlsl       (DirectX shaders)                     │
-│    └─ hw/mtl/msl/*.metal       (Metal shaders)                       │
-│                                                                       │
+│    ├─ hw/d3d/hlsl/*.hlsl       (DirectX shaders)    [Windows]        │
+│    └─ hw/mtl/msl/*.metal       (Metal shaders)      [macOS]          │
+│                                                                      │
 │ Marker: .decora_shaders.marker                                       │
 └──────────────────────────────────────────────────────────────────────┘
                               │
-                              ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│ STEP 5: Flatten Decora Shader Structure                              │
-├──────────────────────────────────────────────────────────────────────┤
-│ Copy from jsl-decora-temp/ to gensrc/javafx.graphics/               │
-│  - Preserves com/sun/scenario/effect package structure              │
-│  - Avoids jsl-decora-temp in final module output                    │
-│                                                                       │
-│ Marker: .shaders_flattened                                           │
-└──────────────────────────────────────────────────────────────────────┘
+              ┌───────────────┴────────────────┐
+              │ (Windows only)                  │
+              ▼                                 ▼
+┌─────────────────────────┐    ┌──────────────────────────────────────┐
+│ STEP 5b: Compile Decora │    │ STEP 5: Flatten Decora Shaders       │
+│ HLSL shaders (Windows)  │    │ (waits for 5b on Windows)            │
+├─────────────────────────┤    ├──────────────────────────────────────┤
+│ FXC /T ps_3_0           │    │ Copy jsl-decora-temp/com →           │
+│ *.hlsl → *.obj          │    │   gensrc/javafx.graphics/com/        │
+│ (into jsl-decora-temp)  │    │ .obj files are copied here too!      │
+│                         │    │                                      │
+│ Marker: .decora_hlsl    │    │ Marker: .shaders_flattened           │
+│         .marker         │    └──────────────────────────────────────┘
+└─────────────────────────┘                     │
+              │                                 │
+              └─────────────────────────────────┘
                               │
                               ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│ STEP 6: Compile Decora Metal Shaders (macOS/iOS only)               │
+│ STEP 5a: Compile Decora Metal Shaders (macOS only)                   │
 ├──────────────────────────────────────────────────────────────────────┤
-│ Compile each .metal file sequentially:                              │
-│   xcrun metal -I mtl-headers *.metal → *.air                        │
-│                                                                       │
-│ ⚠️  CRITICAL: This step creates DecoraShaderCommon.h (1,267 lines)  │
-│     as a side effect when compiling the first Decora Metal shader!  │
-│                                                                       │
-│ Output: msl/Decora/*.air (93 files)                                 │
-│ Output: mtl-headers/DecoraShaderCommon.h (1,267 lines)              │
-│ Output: mtl-headers/FragmentShaderCommon.h (1,329 lines)            │
-│                                                                       │
+│ Compile each .metal file sequentially:                               │
+│   xcrun metal -I mtl-headers *.metal → *.air                         │
+│                                                                      │
+│ ⚠️  CRITICAL: This step creates DecoraShaderCommon.h (1,267 lines)   │
+│     as a side effect when compiling the first Decora Metal shader!   │
+│                                                                      │
+│ Output: msl/Decora/*.air (93 files)                                  │
+│ Output: mtl-headers/DecoraShaderCommon.h (1,267 lines)               │
+│ Output: mtl-headers/FragmentShaderCommon.h (1,329 lines)             │
+│                                                                      │
 │ Marker: _decora_msl.marker                                           │
 └──────────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│ STEP 7: Compile Prism Shader Compilers                               │
+│ STEP 6: Compile Prism Shader Compilers                               │
 ├──────────────────────────────────────────────────────────────────────┤
 │ BUILD_PRISM_COMPILERS                                                │
 │  Input: src/main/jsl-prism/*.java                                    │
 │  Output: classes/jsl-compilers/prism/*.class                         │
-│  Classpath: JSLC + ANTLR + temp javafx.graphics                     │
+│  Classpath: JSLC + ANTLR + temp javafx.graphics                      │
 │  Dependencies: BUILD_JSLC_COMPILER, BUILD_GRAPHICS_CORE_TEMP         │
 └──────────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│ STEP 8: Generate Prism Shaders                                       │
+│ STEP 7: Generate Prism Shaders                                       │
 ├──────────────────────────────────────────────────────────────────────┤
 │ ⚠️  CRITICAL: Sequential for loop prevents header corruption!        │
-│                                                                       │
+│                                                                      │
 │ For each .jsl file (SEQUENTIALLY):                                   │
 │   CompileJSL *.jsl → multiple shader variants                        │
-│                                                                       │
-│ Output: jsl-prism-temp/com/sun/prism/                               │
-│   ├─ d3d/*.hlsl              (DirectX shaders)                       │
+│                                                                      │
+│ Output: jsl-prism-temp/com/sun/prism/                                │
+│   ├─ d3d/hlsl/*.hlsl         (DirectX shaders)    [Windows]          │
 │   ├─ es2/gl/*.glsl           (OpenGL ES 2.0 shaders)                 │
-│   └─ mtl/msl/*.metal         (Metal shaders)                         │
-│                                                                       │
-│ ⚠️  Each CompileJSL invocation APPENDS to PrismShaderCommon.h       │
+│   └─ mtl/msl/*.metal         (Metal shaders)      [macOS]            │
+│                                                                      │
+│ ⚠️  Each CompileJSL invocation APPENDS to PrismShaderCommon.h        │
 │     Must run sequentially to avoid corruption!                       │
-│                                                                       │
+│                                                                      │
 │ Marker: .prism_shaders.marker                                        │
 └──────────────────────────────────────────────────────────────────────┘
                               │
-                              ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│ STEP 9: Flatten Prism Shader Structure                               │
-├──────────────────────────────────────────────────────────────────────┤
-│ Copy from jsl-prism-temp/ to gensrc/javafx.graphics/                │
-│  - Preserves com/sun/prism package structure                        │
-│  - Avoids jsl-prism-temp in final module output                     │
-│                                                                       │
-│ Marker: .prism_flattened                                             │
-└──────────────────────────────────────────────────────────────────────┘
+              ┌───────────────┴─────────────────┐
+              │ (Windows only)                  │
+              ▼                                 ▼
+┌─────────────────────────┐    ┌──────────────────────────────────────┐
+│ STEP 8b: Compile Prism  │    │ STEP 8: Flatten Prism Shaders        │
+│ HLSL shaders (Windows)  │    │ (waits for 8b on Windows)            │
+├─────────────────────────┤    ├──────────────────────────────────────┤
+│ FXC /T ps_3_0           │    │ Copy jsl-prism-temp/com →            │
+│ *.hlsl → *.obj          │    │   gensrc/javafx.graphics/com/        │
+│ (into jsl-prism-temp)   │    │ .obj files are copied here too!      │
+│                         │    │                                      │
+│ Marker: .prism_hlsl     │    │ Marker: .prism_flattened             │
+│         .marker         │    └──────────────────────────────────────┘
+└─────────────────────────┘                     │
+              │                                 │
+              └─────────────────────────────────┘
                               │
                               ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│ STEP 10: Compile Prism Metal Shaders (macOS/iOS only)               │
+│ STEP 8a: Compile Prism Metal Shaders (macOS only)                    │
 ├──────────────────────────────────────────────────────────────────────┤
-│ Compile each .metal file sequentially:                              │
-│   xcrun metal -I mtl-headers *.metal → *.air                        │
-│                                                                       │
-│ ⚠️  CRITICAL: This step UPDATES PrismShaderCommon.h to full size!   │
+│ Compile each .metal file sequentially:                               │
+│   xcrun metal -I mtl-headers *.metal → *.air                         │
+│                                                                      │
+│ ⚠️  CRITICAL: This step UPDATES PrismShaderCommon.h to full size!    │
 │     Final size: 9,982 lines                                          │
-│                                                                       │
-│ Output: msl/Prism/*.air (multiple files)                            │
-│ Output: mtl-headers/PrismShaderCommon.h (9,982 lines - COMPLETE!)   │
-│                                                                       │
+│                                                                      │
+│ Output: msl/Prism/*.air (multiple files)                             │
+│ Output: mtl-headers/PrismShaderCommon.h (9,982 lines - COMPLETE!)    │
+│                                                                      │
 │ Marker: _prism_msl.marker                                            │
 └──────────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│ STEP 11: Compile Native Metal Shaders                                │
+│ STEP 9: Compile and Link Native Metal Shaders (macOS only)           │
 ├──────────────────────────────────────────────────────────────────────┤
-│ Compile built-in Metal shaders from native-prism-mtl/msl/           │
+│ Compile built-in Metal shaders from native-prism-mtl/msl/            │
 │   xcrun metal *.metal → *.air                                        │
-│                                                                       │
+│                                                                      │
 │ Marker: _native_msl.marker                                           │
 └──────────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│ STEP 12: Link Metal Library                                          │
+│ STEP 9 (link): Link Metal Library (macOS only)                       │
 ├──────────────────────────────────────────────────────────────────────┤
-│ Link all .air files into single metallib:                           │
-│   xcrun metallib *.air → jfxshaders.metallib                        │
-│                                                                       │
-│ Output: msl/com/sun/prism/mtl/msl/jfxshaders.metallib              │
+│ Link all .air files into single metallib:                            │
+│   xcrun metallib *.air → jfxshaders.metallib                         │
+│                                                                      │
+│ Output: msl/com/sun/prism/mtl/msl/jfxshaders.metallib                │
 └──────────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│ STEP 13: Copy metallib to Final Location                            │
+│ STEP 10: Copy metallib to Final Location (macOS only)                │
 ├──────────────────────────────────────────────────────────────────────┤
-│ Copy to gensrc output for inclusion in module                       │
-│ Output: gensrc/javafx.graphics/com/sun/prism/mtl/msl/*.metallib    │
+│ Copy to gensrc output for inclusion in module                        │
+│ Output: gensrc/javafx.graphics/com/sun/prism/mtl/msl/*.metallib      │
 └──────────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│ FINAL MARKER: .headers_ready                                         │
+│ FINAL MARKER: .headers_ready (macOS only)                            │
 ├──────────────────────────────────────────────────────────────────────┤
-│ Created after all shader generation and Metal compilation complete  │
-│ Used by Lib.gmk to ensure headers exist before libprism_mtl builds  │
+│ Created after all shader generation and Metal compilation complete   │
+│ Used by Lib.gmk to ensure headers exist before libprism_mtl builds   │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -269,14 +283,15 @@ The build system supports **Windows, macOS, and Linux**:
 
 ---
 
-### Step 1: Download ANTLR and Generate Parser
+### Step 1: Generate ANTLR Parser
 
 **Purpose**: Generate Java parser for JSL (Java Shader Language) grammar.
 
+**Pre-condition**: `antlr-4.13.2-complete.jar` must already be present at `make/data/javafx-tools/` — it is copied there by the repository setup script, **not** downloaded during the build.
+
 **Process**:
-1. Download `antlr-4.13.2-complete.jar` if not present
-2. Run ANTLR on `JSL.g4` grammar file
-3. Generate 6 Java files: Lexer, Parser, Listener, Visitor, and base classes
+1. Run ANTLR on `JSL.g4` grammar file
+2. Generate 6 Java files: Lexer, Parser, Listener, Visitor, and base classes
 
 **Output Files**:
 ```
@@ -291,7 +306,7 @@ support/gensrc/javafx.graphics/antlr/
 
 **Marker**: `ANTLR_OUTPUT_MARKER` (`.../antlr/_antlr.marker`)
 
-**Dependencies**: None
+**Dependencies**: `antlr-4.13.2-complete.jar` (pre-placed)
 
 ---
 
@@ -305,7 +320,7 @@ support/gensrc/javafx.graphics/antlr/
 
 **Marker**: `BUILD_JSLC_COMPILER` (SetupJavaCompilation output)
 
-**Dependencies**: 
+**Dependencies**:
 - `ANTLR_GENERATED_FILES` (Step 1)
 
 **Classpath**:
@@ -356,11 +371,11 @@ java --module-path temp-modules/javafx.base:temp-modules/javafx.graphics \
 **Output**:
 ```
 jsl-decora-temp/com/sun/scenario/effect/impl/
-├── sw/java/*.java         (Software renderer - pure Java)
-├── sw/sse/*.java          (SSE optimized)
-├── prism/ps/*.java        (Prism shader pipeline)
-├── hw/d3d/hlsl/*.hlsl     (DirectX HLSL shaders)
-└── hw/mtl/msl/*.metal     (Metal Shading Language)
+├── sw/java/*.java         (Software renderer - pure Java, all platforms)
+├── sw/sse/*.java          (SSE optimized, all platforms)
+├── prism/ps/*.java        (Prism shader pipeline, all platforms)
+├── hw/d3d/hlsl/*.hlsl     (DirectX HLSL shaders, Windows only)
+└── hw/mtl/msl/*.metal     (Metal Shading Language, macOS only)
 ```
 
 **Marker**: `DECORA_SHADER_MARKER` (`.decora_shaders.marker`)
@@ -372,32 +387,59 @@ jsl-decora-temp/com/sun/scenario/effect/impl/
 
 ---
 
+### Step 5b: Compile Decora HLSL Shaders (Windows only)
+
+**Purpose**: Compile generated Decora HLSL shaders to DirectX `.obj` bytecode files, ready to be copied alongside `.java` files in the flatten step.
+
+**Process** (Windows only):
+```bash
+for FILE in jsl-decora-temp/com/sun/scenario/effect/impl/hw/d3d/hlsl/*.hlsl; do
+  fxc /nologo /T ps_3_0 /Fo $DIR/$(basename $FILE .hlsl).obj $FILE
+done
+```
+
+**Key Design Decision**: `.obj` files are written **into the same `jsl-decora-temp` tree** where the `.hlsl` files live. This mirrors exactly how Metal `.metallib` files are handled on macOS — the flatten step (Step 5) then copies everything, including `.obj` files, to the gensrc output in one go. No changes to the jfx source tree are needed.
+
+**Marker**: `.decora_hlsl.marker`
+
+**Dependencies**:
+- `DECORA_SHADER_MARKER` (Step 4) — `.hlsl` files must exist before FXC runs
+
+**Why Recipe-Level Loop** (not pattern rules):
+At makefile parse time, the `.hlsl` source files don't exist yet (they're generated in Step 4). Using `$(wildcard ...)` at parse time would return empty, making the target a no-op. A shell `for` loop in the recipe evaluates the glob at runtime, after the `.hlsl` files are present.
+
+---
+
 ### Step 5: Flatten Decora Shaders
 
-**Purpose**: Copy generated shaders to final gensrc output, removing temp directory structure.
+**Purpose**: Copy generated shaders (`.java`, `.hlsl`, `.obj`, `.metal`) to final gensrc output, removing temp directory structure.
 
 **Process**:
 ```bash
 cp -R jsl-decora-temp/com → gensrc/javafx.graphics/com
 ```
 
-**Reason**: 
+**Reason**:
 - Java.gmk will include `gensrc/javafx.graphics/` in source compilation
 - We don't want `jsl-decora-temp/` directory in the final module
 - Java.gmk explicitly excludes `jsl-*` patterns to avoid duplication
+- `.obj` files in the temp tree are carried over automatically
+
+**On Windows**: This step waits for both `DECORA_SHADER_MARKER` **and** `.decora_hlsl.marker`, ensuring `.obj` files are compiled before the copy happens.
 
 **Marker**: `SHADER_FLATTEN_MARKER` (`.shaders_flattened`)
 
 **Dependencies**:
 - `DECORA_SHADER_MARKER` (Step 4)
+- `.decora_hlsl.marker` (Step 5b) — **Windows only**
 
 ---
 
-### Step 6: Compile Decora Metal Shaders
+### Step 5a: Compile Decora Metal Shaders (macOS only)
 
 **Purpose**: Compile Decora Metal shaders to native .air format.
 
-**Process** (macOS/iOS only):
+**Process** (macOS only):
 ```bash
 for FILE in jsl-decora-temp/com/sun/scenario/effect/impl/hw/mtl/msl/*.metal; do
   xcrun metal -Wdeprecated -std=macos-metal2.4 \
@@ -424,7 +466,7 @@ When compiling the first Decora Metal shader, the Metal compiler generates:
 
 ---
 
-### Step 7: Compile Prism Shader Compilers
+### Step 6: Compile Prism Shader Compilers
 
 **Purpose**: Compile specialized compilers for Prism rendering pipeline shaders.
 
@@ -442,7 +484,7 @@ When compiling the first Decora Metal shader, the Metal compiler generates:
 
 ---
 
-### Step 8: Generate Prism Shaders
+### Step 7: Generate Prism Shaders
 
 **Purpose**: Generate Prism rendering pipeline shaders from JSL files.
 
@@ -452,7 +494,7 @@ When compiling the first Decora Metal shader, the Metal compiler generates:
 ```bash
 for FILE in src/main/jsl-prism/*.jsl; do
   java CompileJSL -i jsl-prism/ -o jsl-prism-temp/ \
-    -t -pkg com/sun/prism -d3d -es2 -mtl -name $FILE
+    -t -pkg com/sun/prism [-d3d | -mtl -es2 | -es2] -name $FILE
 done
 ```
 
@@ -464,60 +506,75 @@ done
   - Corrupted content with misplaced `#endif` directives
   - Missing function declarations
 
-**Original Failed Approach**:
-```makefile
-# ❌ This caused corruption:
-$(SUPPORT_OUTPUTDIR)/.prism_%.marker: %.jsl
-  CompileJSL -name $<
+**Pipeline options by OS**:
 
-.NOTPARALLEL: $(PRISM_SHADER_MARKERS)  # Doesn't actually serialize pattern rules!
-```
-
-**Working Approach**:
-```makefile
-# ✅ This prevents corruption:
-$(PRISM_SHADER_MARKER): $(BUILD_PRISM_COMPILERS)
-  @for FILE in $(PRISM_JSL_FILES); do
-    CompileJSL -name $$FILE;
-  done
-```
+|---------|--------------|
+| OS      | Options      |
+|---------|--------------|
+| Windows | `-d3d`       |
+| macOS   | `-mtl -es2`  |
+| Linux   | `-es2`       |
+|---------|--------------|
 
 **Output**:
 ```
 jsl-prism-temp/com/sun/prism/
-├── d3d/*.hlsl           (DirectX shaders)
-├── es2/gl/*.glsl        (OpenGL shaders)
-└── mtl/msl/*.metal      (Metal shaders)
+├── d3d/hlsl/*.hlsl      (DirectX shaders, Windows only)
+├── es2/gl/*.glsl        (OpenGL shaders, macOS/Linux)
+└── mtl/msl/*.metal      (Metal shaders, macOS only)
 ```
 
 **Marker**: `PRISM_SHADER_MARKER` (`.prism_shaders.marker`)
 
 **Dependencies**:
-- `BUILD_PRISM_COMPILERS` (Step 7)
+- `BUILD_PRISM_COMPILERS` (Step 6)
 
 ---
 
-### Step 9: Flatten Prism Shaders
+### Step 8b: Compile Prism HLSL Shaders (Windows only)
 
-**Purpose**: Copy Prism shaders to final gensrc output.
+**Purpose**: Compile generated Prism HLSL shaders to DirectX `.obj` bytecode files.
+
+**Process** (Windows only):
+```bash
+for FILE in jsl-prism-temp/com/sun/prism/d3d/hlsl/*.hlsl; do
+  fxc /nologo /T ps_3_0 /Fo $DIR/$(basename $FILE .hlsl).obj $FILE
+done
+```
+
+**Key Design Decision**: Same as Step 5b — `.obj` files go into **the same `jsl-prism-temp/` tree** so the flatten step copies them automatically.
+
+**Marker**: `.prism_hlsl.marker`
+
+**Dependencies**:
+- `PRISM_SHADER_MARKER` (Step 7) — `.hlsl` files must exist before FXC runs
+
+---
+
+### Step 8: Flatten Prism Shaders
+
+**Purpose**: Copy Prism shaders (and `.obj` files on Windows) to final gensrc output.
 
 **Process**:
 ```bash
 cp -R jsl-prism-temp/com → gensrc/javafx.graphics/com
 ```
 
+**On Windows**: This step waits for both `PRISM_SHADER_MARKER` **and** `.prism_hlsl.marker`, ensuring `.obj` files are compiled before the copy.
+
 **Marker**: `PRISM_FLATTEN_MARKER` (`.prism_flattened`)
 
 **Dependencies**:
-- `PRISM_SHADER_MARKER` (Step 8)
+- `PRISM_SHADER_MARKER` (Step 7)
+- `.prism_hlsl.marker` (Step 8b) — **Windows only**
 
 ---
 
-### Step 10: Compile Prism Metal Shaders
+### Step 8a: Compile Prism Metal Shaders (macOS only)
 
 **Purpose**: Compile Prism Metal shaders to native .air format.
 
-**Process** (macOS/iOS only):
+**Process** (macOS only):
 ```bash
 for FILE in jsl-prism-temp/com/sun/prism/mtl/msl/*.metal; do
   xcrun metal -Wdeprecated -std=macos-metal2.4 \
@@ -528,7 +585,7 @@ done
 **Critical Side Effect**:
 ⚠️ **The Metal compiler UPDATES `PrismShaderCommon.h` to its final complete size!**
 
-The header grows from ~4,000 lines (after Step 8) to **9,982 lines** (complete) as Metal compiler processes all Prism shaders and adds platform-specific declarations.
+The header grows from ~4,000 lines (after Step 7) to **9,982 lines** (complete) as Metal compiler processes all Prism shaders.
 
 **Output**:
 - `msl/Prism/*.air` (multiple files)
@@ -537,34 +594,24 @@ The header grows from ~4,000 lines (after Step 8) to **9,982 lines** (complete) 
 **Marker**: `PRISM_MSL_MARKER` (`_prism_msl.marker`)
 
 **Dependencies**:
-- `PRISM_FLATTEN_MARKER` (Step 9)
+- `PRISM_FLATTEN_MARKER` (Step 8)
 
 ---
 
-### Step 11: Compile Native Metal Shaders
+### Step 9: Compile Native Metal Shaders + Link Metal Library (macOS only)
 
-**Purpose**: Compile pre-written Metal shaders from native source.
+**Purpose**: Compile pre-written Metal shaders from native source, then link everything into a single `.metallib`.
 
-**Process**:
+**Compilation**:
 ```bash
 for FILE in src/main/native-prism-mtl/msl/*.metal; do
   xcrun metal -std=macos-metal2.4 -c $FILE → *.air
 done
 ```
 
-**Marker**: `NATIVE_MSL_MARKER` (`_native_msl.marker`)
-
-**Dependencies**: None (independent of generated shaders)
-
----
-
-### Step 12: Link Metal Library
-
-**Purpose**: Combine all Metal .air files into single metallib bundle.
-
-**Process**:
+**Linking** (after Decora, Prism, and Native .air files are all ready):
 ```bash
-xcrun metallib msl/**/*.air -o jfxshaders.metallib
+xcrun metallib $(find msl/ -name "*.air") -o jfxshaders.metallib
 ```
 
 Combines:
@@ -574,14 +621,14 @@ Combines:
 
 **Output**: `msl/com/sun/prism/mtl/msl/jfxshaders.metallib`
 
-**Dependencies**:
-- `DECORA_MSL_MARKER` (Step 6)
-- `PRISM_MSL_MARKER` (Step 10)
-- `NATIVE_MSL_MARKER` (Step 11)
+**Dependencies (linking)**:
+- `DECORA_MSL_MARKER` (Step 5a)
+- `PRISM_MSL_MARKER` (Step 8a)
+- `NATIVE_MSL_MARKER` (native compilation above)
 
 ---
 
-### Step 13: Copy metallib to Final Location
+### Step 10: Copy metallib to Final Location (macOS only)
 
 **Purpose**: Copy metallib to gensrc output for module inclusion.
 
@@ -593,7 +640,7 @@ cp msl/.../jfxshaders.metallib → gensrc/javafx.graphics/com/sun/prism/mtl/msl/
 Java.gmk will include this metallib file in the final javafx.graphics module.
 
 **Dependencies**:
-- Metal library output (Step 12)
+- Metal library output (Step 9 link)
 
 ---
 
@@ -609,7 +656,7 @@ BUILD_BASE_CORE_TEMP (311 classes)
     │
     ▼
 BUILD_GRAPHICS_CORE_TEMP (1,563 classes) ◄──────┐
-    │                                            │
+    │                                           │
     ├──────────────────────────────────┐        │
     ▼                                  ▼        │
 ANTLR_OUTPUT    ──►  BUILD_JSLC  ──►  BUILD_DECORA_COMPILERS
@@ -617,38 +664,50 @@ ANTLR_OUTPUT    ──►  BUILD_JSLC  ──►  BUILD_DECORA_COMPILERS
     │                    │                      ▼
     │                    │              DECORA_SHADER_MARKER
     │                    │                      │
-    │                    │                      ▼
-    │                    │              SHADER_FLATTEN_MARKER
-    │                    │                      │
-    │                    │                      ▼
-    │                    │              DECORA_MSL_MARKER ──────┐
-    │                    │              (Creates DecoraShaderCommon.h)
-    │                    │                      │               │
-    │                    ▼                      │               │
-    │            BUILD_PRISM_COMPILERS          │               │
-    │                    │                      │               │
-    │                    ▼                      │               │
-    │            PRISM_SHADER_MARKER ◄──────────┘               │
-    │            (Sequential for loop!)                         │
-    │                    │                                      │
-    │                    ▼                                      │
-    │            PRISM_FLATTEN_MARKER                           │
-    │                    │                                      │
-    │                    ▼                                      │
-    │            PRISM_MSL_MARKER                               │
-    │            (Updates PrismShaderCommon.h to 9,982 lines)   │
-    │                    │                                      │
-    │                    └──────────────────┐                   │
-    ▼                                       ▼                   │
-NATIVE_MSL_MARKER                   METAL_LIB_OUTPUT           │
-                                            │                   │
-                                            ▼                   │
-                                    METALLIB_GENSRC_OUTPUT      │
-                                                                │
-                    ┌───────────────────────────────────────────┘
+    │                    │        ┌─────────────┤ (Windows: also waits)
+    │                    │        ▼             │
+    │                    │  HLSL_DECORA_MARKER  │
+    │                    │  (.decora_hlsl)      │
+    │                    │        │             │
+    │                    │        └──────┬──────┘
+    │                    │               ▼
+    │                    │       SHADER_FLATTEN_MARKER
+    │                    │               │
+    │                    │               ▼ (macOS only)
+    │                    │       DECORA_MSL_MARKER ──────┐
+    │                    │       (Creates DecoraShaderCommon.h)
+    │                    │               │               │
+    │                    ▼               │               │
+    │            BUILD_PRISM_COMPILERS   │               │
+    │                    │               │               │
+    │                    ▼               │               │
+    │            PRISM_SHADER_MARKER     │               │
+    │            (Sequential for loop!)  │               │
+    │                    │               │               │
+    │        ┌───────────┤ (Windows)     │               │
+    │        ▼           │               │               │
+    │  HLSL_PRISM_MARKER │               │               │
+    │  (.prism_hlsl)     │               │               │
+    │        │           │               │               │
+    │        └─────┬─────┘               │               │
+    │              ▼                     │               │
+    │      PRISM_FLATTEN_MARKER          │               │
+    │              │                     │               │
+    │              ▼ (macOS only)        │               │
+    │      PRISM_MSL_MARKER              │               │
+    │      (Updates PrismShaderCommon.h) │               │
+    │              │                     │               │
+    │              └──────────┐          │               │
+    ▼                         ▼          │               │
+NATIVE_MSL_MARKER       METAL_LIB_OUTPUT                 │
+                                │                        │
+                                ▼                        │
+                        METALLIB_GENSRC_OUTPUT           │
+                                                         │
+                    ┌────────────────────────────────────┘
                     ▼
             MTL_HEADERS_READY_MARKER
-            (All 3 headers complete!)
+            (All 3 headers complete! - macOS only)
 ```
 
 ---
@@ -670,7 +729,19 @@ The build uses **marker files** to enforce execution order:
    - Subsequent steps depend on these markers
    - Enables incremental builds (step skipped if marker exists and inputs unchanged)
 
-3. **SetupJavaCompilation Output**: The `$(BUILD_*)` variables contain marker files
+3. **Pre-declared Variables**: `HLSL_DECORA_MARKER` and `HLSL_PRISM_MARKER` are assigned **before** they are referenced in flatten prerequisites:
+   ```makefile
+   # Pre-declared before flatten steps
+   HLSL_DECORA_MARKER :=
+   HLSL_PRISM_MARKER :=
+   ifeq ($(call isTargetOs, windows), true)
+     HLSL_DECORA_MARKER := .../decora_hlsl.marker
+     HLSL_PRISM_MARKER  := .../prism_hlsl.marker
+   endif
+   ```
+   On non-Windows these are empty, so the flatten steps have no extra dependency.
+
+4. **SetupJavaCompilation Output**: The `$(BUILD_*)` variables contain marker files
    - Example: `BUILD_BASE_CORE_TEMP` expands to the batch marker file path
    - Used as dependencies: `DEPENDS := $(BUILD_GRAPHICS_CORE_TEMP)`
 
@@ -692,7 +763,24 @@ target.marker: $(ALL_JSL_FILES)
   done
 ```
 
-The `for` loop in the shell recipe ensures sequential execution within a single Make target.
+### Recipe-Level Loops for HLSL (and Metal)
+
+**Problem**: `$(wildcard ...)` expands at **parse time**, before any shaders are generated:
+```makefile
+# ❌ HLSL files don't exist yet at parse time - objects list will be empty:
+HLSL_OBJECTS := $(patsubst %.hlsl, %.obj, $(wildcard $(HLSL_DIR)/*.hlsl))
+```
+
+**Solution**: Use a shell `for` loop in the recipe, which evaluates the glob at runtime:
+```makefile
+# ✅ Glob evaluated at runtime, after .hlsl files exist:
+$(HLSL_MARKER): $(SHADER_MARKER)
+  for FILE in $(HLSL_DIR)/*.hlsl; do
+    fxc ... $$FILE;
+  done
+```
+
+This is the same pattern used for Metal shader compilation on macOS.
 
 ### Phase Ordering
 
@@ -720,32 +808,24 @@ For javafx.graphics:
 - Missing function declarations
 - Compilation errors: "call to undeclared function"
 
-**Root Cause**: 
-Parallel execution of Prism shader generation causes multiple processes to write to the same header file simultaneously, resulting in corruption.
-
-**Failed Solutions**:
-- ❌ `.NOTPARALLEL: $(PRISM_SHADER_MARKERS)` - Doesn't serialize pattern rules
-- ❌ Dependency chains between markers - Complex and unreliable
+**Root Cause**:
+Parallel execution of Prism shader generation causes multiple processes to write to the same header file simultaneously.
 
 **Working Solution**:
-✅ Replace pattern rule with single target using sequential for loop (see Step 8)
+✅ Replace pattern rule with single target using sequential for loop (see Step 7)
 
 ---
 
 ### Issue 2: DecoraShaderCommon.h Not Generated
 
 **Symptoms**:
-- Only PrismShaderCommon.h and FragmentShaderCommon.h exist
-- DecoraShaderCommon.h missing
+- Only `PrismShaderCommon.h` and `FragmentShaderCommon.h` exist
+- `DecoraShaderCommon.h` missing
 - Compilation error: `'DecoraShaderCommon.h' file not found`
 - Metal library (libprism_mtl) fails to compile
 
 **Root Cause**:
-`DecoraShaderCommon.h` is created as a **side effect** of compiling Decora Metal shaders (Step 6). If the Decora MSL compilation step doesn't run, this header is never created.
-
-**Cause of Step Being Skipped**:
-- `DECORA_MSL_MARKER` not included in final TARGETS or marker dependencies
-- Step 6 runs but isn't required by anything else
+`DecoraShaderCommon.h` is created as a **side effect** of compiling Decora Metal shaders (Step 5a). If the Decora MSL compilation step doesn't run, this header is never created.
 
 **Solution**:
 ✅ Make `MTL_HEADERS_READY_MARKER` depend on `DECORA_MSL_MARKER`:
@@ -755,57 +835,68 @@ $(MTL_HEADERS_READY_MARKER): $(SHADER_FLATTEN_MARKER) $(PRISM_FLATTEN_MARKER) $(
 
 ---
 
-### Issue 3: Temp Core Classes Version Mismatch
+### Issue 3: HLSL .obj Files Not Found at Runtime (Windows)
 
 **Symptoms**:
-- Error: "Unsupported major.minor version 71.0"
-- GenAllDecoraShaders fails with ClassNotFoundException
-- No hw/ directories in generated Decora shaders
+- Build succeeds but `getResourceAsStream("hlsl/Name.obj")` returns null
+- D3D renderer fails to load shaders at runtime
 
 **Root Cause**:
-Temp core classes compiled with Java 27 bytecode, but shader generation tools expecting Java 25.
+Previously, `.obj` files were written to a separate output directory or to the jfx source tree, neither of which is picked up as module resources by the Java compiler.
 
-**Solution**:
-✅ Use consistent Java version throughout (Java 27 everywhere, or --release 25 everywhere)
+**Working Solution**:
+✅ Write `.obj` files into the **same temp directory** as the `.hlsl` source files (`jsl-decora-temp/` and `jsl-prism-temp/`). The flatten step then copies them to `gensrc/javafx.graphics/com/sun/...`, where they become module resources compiled into `javafx.graphics`.
 
 ---
 
-### Issue 4: Missing hw/ Directories in Decora Output
+### Issue 4: HLSL Objects Not Compiled (Empty for Loop)
 
 **Symptoms**:
-- Only `sw/` and `prism/` directories generated
-- No `hw/d3d/` or `hw/mtl/` directories
-- Only software shaders generated, no hardware shaders
+- `.decora_hlsl.marker` or `.prism_hlsl.marker` created but empty
+- No `.obj` files in temp dirs
 
 **Root Cause**:
-Shader generation tool couldn't load Effect classes from temp modules due to version mismatch or missing module exports.
+Pattern rules using `$(wildcard ...)` at parse time find no `.hlsl` files because they haven't been generated yet.
 
-**Solution**:
-✅ Ensure:
-- Temp modules use correct Java version
-- `--add-modules=javafx.base,javafx.graphics`
-- `--add-exports` for all required internal packages
-- Module-path correctly points to temp-modules
+**Working Solution**:
+✅ Use a recipe-level shell `for` loop with a glob pattern. The glob runs at recipe execution time, after the `.hlsl` files have been generated by the preceding step.
 
 ---
 
-### Issue 5: Headers Not Available for libprism_mtl
+### Issue 5: Flatten Step Runs Before HLSL Compilation (Windows)
+
+**Symptoms**:
+- `.obj` files missing from gensrc output
+- `cp -R` in flatten step runs before FXC has produced `.obj` files
+
+**Root Cause**:
+`HLSL_DECORA_MARKER` / `HLSL_PRISM_MARKER` were either not defined yet when referenced in flatten prerequisites, or were not listed as dependencies.
+
+**Working Solution**:
+✅ Pre-declare both HLSL marker variables before the flatten step, then assign them inside the `ifeq ($(call isTargetOs, windows), true)` block. The flatten step prerequisites reference these variables, which are empty on non-Windows (no extra dependency) and point to the HLSL marker files on Windows.
+
+---
+
+### Issue 6: Missing hw/ Directories in Decora Output
+
+```bash
+ls build/jfx/support/javafx-build/javafx.graphics/jsl-decora-temp/com/sun/scenario/effect/impl/
+# Should show: hw/, sw/, prism/
+```
+
+**Cause**: Java version mismatch or missing module exports. **Fix**: Verify `--add-exports` flags.
+
+---
+
+### Issue 7: libprism_mtl Compilation Fails (macOS)
 
 **Symptoms**:
 - `MetalShader.m` compilation fails
 - Error: `'DecoraShaderCommon.h' file not found`
 - libprism_mtl not built
 
-**Root Cause**:
-Lib.gmk tries to compile Metal library before gensrc has created the headers.
-
-**Failed Solutions**:
-- ❌ Wildcard checks: Evaluated at parse time before gensrc runs
-- ❌ Dummy headers: Prevent real headers from being created
-- ❌ DEPENDS in SetupJdkLibrary: Doesn't work across build phases
-
 **Working Solution**:
-✅ Trust OpenJDK phase ordering - gensrc always completes before libs for the same module. Simply remove conditional checks and declare the library target.
+✅ Trust OpenJDK phase ordering — gensrc always completes before libs for the same module. Ensure `MTL_HEADERS_READY_MARKER` depends on all header-generating steps (including `DECORA_MSL_MARKER`).
 
 ---
 
@@ -830,6 +921,12 @@ OPENJFX_MODULES_SRC/modules/javafx.graphics/
     └── msl/*.metal                   # Native Metal shaders
 ```
 
+### Build Data
+```
+make/data/javafx-tools/
+└── antlr-4.13.2-complete.jar         # Pre-placed by setup script (not downloaded)
+```
+
 ### Output Directories
 ```
 build/jfx/support/javafx-build/javafx.graphics/
@@ -843,306 +940,12 @@ build/jfx/support/javafx-build/javafx.graphics/
 │       └── prism/                    # Prism compiler classes
 ├── jsl-decora-temp/                  # Generated Decora shaders (temp)
 │   └── com/sun/scenario/effect/impl/
+│       ├── sw/java/*.java
+│       ├── sw/sse/*.java
+│       ├── prism/ps/*.java
+│       ├── hw/d3d/hlsl/*.hlsl        # (also *.obj on Windows, compiled in place)
+│       └── hw/mtl/msl/*.metal
 ├── jsl-prism-temp/                   # Generated Prism shaders (temp)
 │   └── com/sun/prism/
-├── msl/                              # Compiled Metal shaders
-│   ├── Decora/*.air                  # 93 files
-│   ├── Prism/*.air                   # Multiple files
-│   └── com/sun/prism/mtl/msl/
-│       └── jfxshaders.metallib       # Final Metal library
-└── mtl-headers/                      # Generated C/ObjC headers
-    ├── DecoraShaderCommon.h          # 1,267 lines
-    ├── FragmentShaderCommon.h        # 1,329 lines
-    ├── PrismShaderCommon.h           # 9,982 lines
-    └── .headers_ready                # Marker for Lib.gmk
-
-build/jfx/support/gensrc/javafx.graphics/  # Final gensrc output
-├── antlr/                            # Generated parser (Step 1)
-└── com/                              # Flattened shader sources
-    ├── sun/scenario/effect/          # Decora shaders (602 .java)
-    └── sun/prism/                    # Prism shaders + metallib
-```
-
----
-
-## Marker Files Reference
-
-### Purpose of Markers
-
-Marker files are empty timestamp files created when a build step completes successfully. They serve two purposes:
-
-1. **Dependency Tracking**: Subsequent steps depend on markers to ensure ordering
-2. **Incremental Builds**: If marker exists and inputs haven't changed, step is skipped
-
-### Marker File List
-
-| Marker File | Step | Created By | Used By |
-|-------------|------|------------|---------|
-| `_antlr.marker` | 1 | ANTLR parser generation | BUILD_JSLC_COMPILER |
-| `_the.BUILD_JSLC_COMPILER_batch` | 2 | JSLC compilation | Decora/Prism compilers |
-| `_the.BUILD_DECORA_COMPILERS_batch` | 3 | Decora compiler compilation | Decora shader generation |
-| `.decora_shaders.marker` | 4 | GenAllDecoraShaders | Shader flatten |
-| `.shaders_flattened` | 5 | Decora flatten | Decora MSL compilation |
-| `_decora_msl.marker` | 6 | Decora Metal compilation | MTL_HEADERS_READY |
-| `_the.BUILD_PRISM_COMPILERS_batch` | 7 | Prism compiler compilation | Prism shader generation |
-| `.prism_shaders.marker` | 8 | Prism shader generation (for loop) | Prism flatten |
-| `.prism_flattened` | 9 | Prism flatten | Prism MSL compilation |
-| `_prism_msl.marker` | 10 | Prism Metal compilation | Metal library linking |
-| `_native_msl.marker` | 11 | Native Metal compilation | Metal library linking |
-| `.headers_ready` | Final | After all headers created | Lib.gmk libprism_mtl |
-
----
-
-## Generated Header Files
-
-### DecoraShaderCommon.h (1,267 lines)
-
-**Created By**: Decora Metal shader compilation (Step 6) as a side effect
-
-**Contents**:
-- Function declarations for all Decora effect shaders
-- Example: `NSDictionary* getDECORADict(NSString *shaderName)`
-- Argument buffer ID enums for Metal shaders
-- Used by MetalShader.m in libprism_mtl
-
-**When Created**: 
-When the Metal compiler processes the first `.metal` file from Decora shaders, it generates this header containing declarations for all Decora shader entry points.
-
----
-
-### FragmentShaderCommon.h (1,329 lines)
-
-**Created By**: Decora Metal shader compilation (Step 6) as a side effect
-
-**Contents**:
-- Common fragment shader utilities
-- Shared functions used across multiple shaders
-
----
-
-### PrismShaderCommon.h (9,982 lines)
-
-**Created By**: 
-- Initially created/appended during Prism shader generation (Step 8)
-- **UPDATED/COMPLETED** during Prism Metal shader compilation (Step 10)
-
-**Contents**:
-- Function declarations for all Prism rendering shaders
-- Argument buffer ID enums
-- Uniform structure definitions
-- Platform-specific (Metal) declarations added during Metal compilation
-
-**Critical Notes**:
-- ⚠️ **Must be generated sequentially** (for loop in Step 8) to prevent corruption
-- Grows incrementally as each Prism shader is processed
-- Final size achieved after Metal shader compilation
-- If generated in parallel, file will be incomplete/corrupted
-
-**Expected Line Counts**:
-- After Step 8 (shader generation): ~4,000-5,000 lines
-- After Step 10 (Metal compilation): **9,982 lines** (complete)
-
----
-
-## Build System Integration
-
-### OpenJDK Build Phase Architecture
-
-```
-Module Build Phases (executed in order):
-1. gensrc    → Generate source files (shaders, parsers, etc.)
-2. java      → Compile Java sources (including generated)
-3. libs      → Build native libraries
-4. launchers → Build executable launchers
-5. jmods     → Package into jmod files
-```
-
-**For javafx.graphics**:
-```
-javafx.graphics-gensrc
-  ↓
-javafx.graphics-java
-  ↓
-javafx.graphics-libs
-```
-
-### Integration Points
-
-**Gensrc.gmk → Java.gmk**:
-- Java.gmk includes `gensrc/javafx.graphics/` in SRC compilation
-- Generated shader .java files are compiled into the module
-- Java.gmk excludes `jsl-*` directory patterns to avoid temp artifacts
-- **Note**: `.metal` and `.hlsl` files are NOT included in the final module (only used during native compilation)
-
-**Gensrc.gmk → Lib.gmk**:
-- Lib.gmk uses headers from `mtl-headers/` directory
-- `MTL_HEADERS_READY_MARKER` indicates all headers are complete
-- libprism_mtl compilation includes headers with `-I` flag
-
-**Java.gmk → Module Output**:
-- Generated shader .java source files are compiled into classes
-- Shader resource files (.frag, .metallib) are copied into final module
-- **Metal (.metal) and HLSL (.hlsl) files are excluded** - they're only intermediate files used during native shader compilation
-
----
-
-## Performance Considerations
-
-### Parallel Compilation
-
-**What Runs in Parallel** (Safe):
-- Different source files within SetupJavaCompilation
-- Different modules (javafx.base and javafx.graphics temp compilation can overlap)
-- Independent shader compiler compilation (Decora and Prism compilers)
-
-**What Must Run Sequentially** (Required):
-- ⚠️ **Prism shader generation** (Step 8) - Each JSL file must be processed one at a time
-- Metal shader compilation within each step (for loops are sequential)
-
-### Build Time
-
-Typical build times on modern hardware:
-- Step 0 (Temp class compilation): 20-30 seconds
-- Steps 1-3 (ANTLR + compilers): 10-15 seconds
-- Step 4 (Decora generation): 5-10 seconds
-- Step 8 (Prism generation): 30-60 seconds (sequential)
-- Steps 6, 10 (Metal compilation): 15-30 seconds
-- **Total gensrc phase**: ~2-3 minutes
-
-**Sequential Prism shader generation adds time but prevents corruption!**
-
----
-
-## Troubleshooting Guide
-
-### Header Corruption (4,660 lines instead of 9,982)
-
-**Diagnosis**:
-```bash
-wc -l build/jfx/support/javafx-build/javafx.graphics/mtl-headers/PrismShaderCommon.h
-# Expected: 9982
-# Problem: 4660 or other incomplete number
-```
-
-**Cause**: Parallel Prism shader generation
-
-**Fix**: Verify Step 8 uses for loop, not pattern rule
-
----
-
-### Missing DecoraShaderCommon.h
-
-**Diagnosis**:
-```bash
-ls build/jfx/support/javafx-build/javafx.graphics/mtl-headers/
-# Should show: DecoraShaderCommon.h, FragmentShaderCommon.h, PrismShaderCommon.h
-```
-
-**Cause**: Decora Metal compilation (Step 6) didn't run
-
-**Fix**: Ensure `MTL_HEADERS_READY_MARKER` depends on `DECORA_MSL_MARKER`
-
----
-
-### No hw/ Directories in Decora Output
-
-**Diagnosis**:
-```bash
-ls build/jfx/support/javafx-build/javafx.graphics/jsl-decora-temp/com/sun/scenario/effect/impl/
-# Should show: hw/, sw/, prism/
-# Problem: Only sw/ and prism/
-```
-
-**Cause**: 
-- Java version mismatch preventing temp module loading
-- Missing module exports preventing Effect class access
-
-**Fix**: 
-- Use consistent Java version
-- Verify `--add-exports` flags include all required packages
-
----
-
-### libprism_mtl Compilation Fails
-
-**Diagnosis**:
-```bash
-make CONF=jfx javafx.graphics-libs
-# Error: 'DecoraShaderCommon.h' file not found
-```
-
-**Cause**: Headers not generated yet or Lib.gmk wildcard check failed at parse time
-
-**Fix**: 
-- Remove conditional checks from Lib.gmk
-- Trust OpenJDK phase ordering
-- Ensure MTL_HEADERS_READY_MARKER depends on all header-generating steps
-
----
-
-## Key Takeaways
-
-1. ✅ **Temp core class compilation** solves the circular dependency between shader compilers and javafx.graphics
-2. ✅ **Sequential for loop** for Prism shader generation prevents header corruption
-3. ✅ **Marker files** enforce proper execution order through Make's dependency system
-4. ✅ **Side effect headers** (DecoraShaderCommon.h) require explicit dependency on Metal compilation step
-5. ✅ **Trust OpenJDK phase ordering** - gensrc always completes before libs for the same module
-
----
-
-## File Generation Summary
-
-### Total Generated Files
-
-- **Temp core classes**: 1,874 .class files
-- **ANTLR parser**: 6 .java files
-- **Compiled shaders**: 602 .java files
-- **Metal shaders**: 93+ .air files
-- **Headers**: 3 .h files (12,578 total lines)
-- **Metal library**: 1 .metallib file
-- **Final module shaders**: 539 resource files
-
-### Final Module Contents
-
-```
-jdk/modules/javafx.graphics/
-├── com/
-│   └── sun/
-│       ├── prism/
-│       │   ├── d3d/hlsl/*.obj        (DirectX shaders, Windows only)
-│       │   ├── es2/glsl/*.frag       (OpenGL fragment shaders, macOS/iOS/Linux)
-│       │   └── mtl/msl/jfxshaders.metallib  (Compiled Metal library, macOS/iOS only)
-│       └── scenario/effect/impl/
-│           ├── es2/glsl/*.frag       (Effect fragment shaders, macOS/iOS/Linux)
-│           ├── sw/java/*.class       (Software renderer, all platforms)
-│           ├── sw/sse/*.class        (SSE optimized, all platforms)
-│           ├── prism/ps/*.class      (Prism pipeline, all platforms)
-│           ├── prism/sw/*.class      (Prism software, all platforms)
-│           └── hw/
-│               ├── d3d/hlsl/*.obj    (DirectX shaders, Windows only)
-│               └── mtl/*.class       (Metal shader wrappers, macOS/iOS only)
-├── javafx/
-│   └── (other javafx.graphics classes)
-└── module-info.class
-
-Note: .metal and .hlsl source files are NOT included in the module.
-They are intermediate files used only during native compilation to
-produce .air files (Metal) or .obj files (DirectX), which are then
-linked into the metallib or the native library.
-```
-
----
-
-## References
-
-- **Source**: `openjdk-ext/src/javafx.graphics/Gensrc.gmk`
-- **Related**: `Java.gmk`, `Lib.gmk`
-- **Original bash script**: `jpereda-jfx/scripts/script.sh`
-- **OpenJDK Build System**: `make/common/`, `make/Main.gmk`
-
----
-
-*Last Updated: February 17, 2026*
-*JavaFX Version: 27*
-*OpenJDK Mobile Build System*
-
+│       ├── d3d/hlsl/*.hlsl           # (also *.obj on Windows, compiled in place)
+│       ├── es2/gl/*.glsl       

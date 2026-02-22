@@ -86,17 +86,10 @@ ifeq ($(call isTargetOs, windows), true)
 ## Build libprism_d3d
 ################################################################################
 
-$(eval $(call SetupJdkLibrary, BUILD_LIBPRISM_D3D, \
-    NAME := prism_d3d, \
-    OPTIMIZATION := HIGH, \
-    CFLAGS_windows := -EHsc -D_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR -DINLINE=__inline -DUNICODE -D_UNICODE -permissive -std:c++14, \
-    CFLAGS_windows += -I$(OPENJFX_MODULES_SRC)/modules/javafx.graphics/build/headers/PrismD3D, \
-    LIBS_windows := -manifest -dynamicbase -nxcompat user32.lib, \
-    SRC := $(OPENJFX_MODULES_SRC)/modules/javafx.graphics/src/main/native-prism-d3d, \
-    EXTRA_SRC := $(OPENJFX_MODULES_SRC)/modules/javafx.graphics/src/main/native-prism-d3d/hlsl, \
-))
-
-TARGETS += $(BUILD_LIBPRISM_D3D)
+# Create the D3D prism library
+ifeq ($(call isTargetOs, windows), true)
+  include lib/D3DLibraries.gmk
+endif
 endif
 
 ################################################################################
@@ -123,10 +116,9 @@ $(eval $(call SetupJdkLibrary, BUILD_LIBGLASS, \
     LIBS_linux := -lX11, \
     LIBS_macosx := -framework AppKit -framework ApplicationServices -framework Metal -framework Carbon -framework OpenGL -framework QuartzCore -framework Security -framework Network, \
     LIBS_ios := -framework AppKit -framework ApplicationServices -framework Metal -framework Carbon -framework OpenGL -framework QuartzCore -framework Security -framework Network, \
-    LIBS_windows := -manifest -dynamicbase -nxcompat delayimp.lib gdi32.lib urlmon.lib Comdlg32.lib winmm.lib imm32.lib shell32.lib Uiautomationcore.lib dwmapi.lib version.lib /DELAYLOAD:user32.dll /DELAYLOAD:urlmon.dll /DELAYLOAD:winmm.dll /DELAYLOAD:shell32.dll /DELAYLOAD:Uiautomationcore.dll /DELAYLOAD:dwmapi.dll /DELAYLOAD:version.dll, \
+    LIBS_windows := -manifest -dynamicbase -nxcompat delayimp.lib gdi32.lib urlmon.lib Comdlg32.lib winmm.lib imm32.lib shell32.lib Uiautomationcore.lib dwmapi.lib shlwapi.lib version.lib /DELAYLOAD:user32.dll /DELAYLOAD:urlmon.dll /DELAYLOAD:winmm.dll /DELAYLOAD:shell32.dll /DELAYLOAD:Uiautomationcore.dll /DELAYLOAD:dwmapi.dll /DELAYLOAD:version.dll, \
     EXTRA_FILES := $(EXTRA_GLASS_SRC), \
     CFLAGS_macosx := -DMACOS_MIN_VERSION_MAJOR=11 -DMACOS_MIN_VERSION_MINOR=0, \
-    CFLAGS_ios := -DMAT_IOS_DEBUG, \
     CFLAGS_windows := -EHsc -D_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR -DINLINE=__inline -DUNICODE -D_UNICODE -permissive -std:c++14, \
 ))
 
