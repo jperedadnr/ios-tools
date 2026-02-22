@@ -9,11 +9,8 @@ include Execute.gmk
 ################################################################################
 
 # Configure path separator for cross-platform support
-ifeq ($(call isTargetOs, windows), true)
-  PATH_SEP := ;
-else
-  PATH_SEP := :
-endif
+# NOTE: Always use colon - fixpath will convert to semicolon on Windows if needed
+PATH_SEP := :
 
 GRAPHICS_MODULE_SRC := $(OPENJFX_MODULES_SRC)/modules/javafx.graphics
 
@@ -161,18 +158,22 @@ else ifeq ($(call isTargetOs, linux), true)
   DECORA_PIPELINE_OPTS := -es2
 endif
 
+# Build classpath for Decora shader generation
+DECORA_JAVA_CP := $(ANTLR_JAR)$(PATH_SEP)$(JSLC_CLASSES_DIR)$(PATH_SEP)$(GRAPHICS_MODULE_SRC)/src/jslc/resources$(PATH_SEP)$(DECORA_COMPILER_CLASSES_DIR)$(PATH_SEP)$(DECORA_COMPILER_SRC_DIR)
+DECORA_MODULE_PATH := $(BASE_CORE_TEMP_DIR)$(PATH_SEP)$(GRAPHICS_CORE_TEMP_DIR)
+
 $(DECORA_SHADER_MARKER): $(BUILD_DECORA_COMPILERS)
 	$(call LogInfo, Generating Decora shaders)
 	$(call MakeDir, $(JSL_DECORA_TEMP_DIR))
 ifeq ($(call isTargetOs, macosx), true)
 	$(call MakeDir, $(MTL_HEADERS_DIR))
 endif
-	$(JAVA) --module-path "$(BASE_CORE_TEMP_DIR)$(PATH_SEP)$(GRAPHICS_CORE_TEMP_DIR)" \
+	$(JAVA) --module-path $(DECORA_MODULE_PATH) \
 	    --add-modules=javafx.base,javafx.graphics \
 	    --add-exports=javafx.graphics/com.sun.scenario.effect=ALL-UNNAMED \
 	    --add-exports=javafx.graphics/com.sun.scenario.effect.light=ALL-UNNAMED \
 	    --add-exports=javafx.graphics/com.sun.scenario.effect.impl.state=ALL-UNNAMED \
-	    -cp "$(ANTLR_JAR)$(PATH_SEP)$(JSLC_CLASSES_DIR)$(PATH_SEP)$(GRAPHICS_MODULE_SRC)/src/jslc/resources$(PATH_SEP)$(DECORA_COMPILER_CLASSES_DIR)$(PATH_SEP)$(DECORA_COMPILER_SRC_DIR)" \
+	    -cp $(DECORA_JAVA_CP) \
 	    -Dfile.encoding=UTF-8 \
 	    GenAllDecoraShaders -i $(DECORA_COMPILER_SRC_DIR) -o $(JSL_DECORA_TEMP_DIR) \
 	    -t -pkg com/sun/scenario/effect $(DECORA_PIPELINE_OPTS) -all GenAllDecoraShaders
@@ -246,6 +247,10 @@ else ifeq ($(call isTargetOs, linux), true)
   PRISM_PIPELINE_OPTS := -es2
 endif
 
+# Build classpath for Prism shader generation
+PRISM_JAVA_CP := $(ANTLR_JAR)$(PATH_SEP)$(JSLC_CLASSES_DIR)$(PATH_SEP)$(GRAPHICS_MODULE_SRC)/src/jslc/resources$(PATH_SEP)$(PRISM_COMPILER_CLASSES_DIR)$(PATH_SEP)$(PRISM_COMPILER_SRC_DIR)
+PRISM_MODULE_PATH := $(BASE_CORE_TEMP_DIR)$(PATH_SEP)$(GRAPHICS_CORE_TEMP_DIR)
+
 # Use single target with for loop to serialize execution (prevents PrismShaderCommon.h corruption)
 $(PRISM_SHADER_MARKER): $(BUILD_PRISM_COMPILERS)
 	$(call LogInfo, Generating Prism shaders)
@@ -254,12 +259,12 @@ ifeq ($(call isTargetOs, macosx), true)
 	$(call MakeDir, $(MTL_HEADERS_DIR))
 endif
 	@for FILE in $(PRISM_JSL_FILES); do \
-	  $(JAVA) --module-path "$(BASE_CORE_TEMP_DIR)$(PATH_SEP)$(GRAPHICS_CORE_TEMP_DIR)" \
+	  $(JAVA) --module-path $(PRISM_MODULE_PATH) \
 	      --add-modules=javafx.base,javafx.graphics \
 	      --add-exports=javafx.graphics/com.sun.scenario.effect=ALL-UNNAMED \
 	      --add-exports=javafx.graphics/com.sun.scenario.effect.light=ALL-UNNAMED \
 	      --add-exports=javafx.graphics/com.sun.scenario.effect.impl.state=ALL-UNNAMED \
-	      -cp "$(ANTLR_JAR)$(PATH_SEP)$(JSLC_CLASSES_DIR)$(PATH_SEP)$(GRAPHICS_MODULE_SRC)/src/jslc/resources$(PATH_SEP)$(PRISM_COMPILER_CLASSES_DIR)$(PATH_SEP)$(PRISM_COMPILER_SRC_DIR)" \
+	      -cp $(PRISM_JAVA_CP) \
 	      -Dfile.encoding=UTF-8 \
 	      CompileJSL -i $(PRISM_COMPILER_SRC_DIR) -o $(JSL_PRISM_TEMP_DIR) \
 	      -t -pkg com/sun/prism $(PRISM_PIPELINE_OPTS) -name $$FILE; \
