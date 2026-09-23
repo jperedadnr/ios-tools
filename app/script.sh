@@ -67,7 +67,7 @@ upload=${3:-"true"}
 
 root=$PWD
 buildPath=$root/build
-localPath=$root/local
+localPath=$root/../local
 
 rm -rf build
 
