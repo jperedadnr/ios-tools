@@ -1,3 +1,5 @@
+#include "jimage.hpp"
+
 extern void* JDK_Canonicalize;
 extern void* Java_java_lang_reflect_Array_get;
 extern void* Java_java_lang_reflect_Array_getBoolean;
@@ -447,6 +449,11 @@ extern void* Java_java_util_zip_Inflater_initIDs;
 extern void* Java_java_util_zip_Inflater_reset;
 extern void* Java_java_util_zip_Inflater_setDictionary;
 extern void* Java_java_util_zip_Inflater_setDictionaryBuffer;
+
+void* duml0 = (void*)&JIMAGE_Open;
+void* duml1 = (void*)&JIMAGE_Close;
+void* duml2 = (void*)&JIMAGE_FindResource;
+void* duml3 = (void*)&JIMAGE_GetResource;
 void* duml4 = JDK_Canonicalize;
 void* l10 = Java_java_lang_reflect_Array_get;
 void* l11 = Java_java_lang_reflect_Array_getBoolean;
