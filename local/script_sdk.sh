@@ -126,6 +126,7 @@ if [[ ! -d "mobile" ]]; then
   cd mobile || exit
   patch -p1 < ../openjfx-build/openjdk-ext/src/jfx.patch
   git apply "$root/../../.github/patches/debug-ios-patch.diff"
+  git apply "$root/../../.github/patches/zero-wx-healing.diff"
   cd ..
 fi
 

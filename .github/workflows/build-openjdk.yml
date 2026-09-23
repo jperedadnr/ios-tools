@@ -68,6 +68,7 @@ jobs:
           patch -p1 < ../openjfx-build/openjdk-ext/src/jfx.patch
           
           cp ../openjdk-ext/src/hotspot/symbol_keeper.cpp src/hotspot/os/bsd
+          git apply ../.github/patches/zero-wx-healing.diff
           
           bash configure \
             --with-conf-name=ios-aarch64-zero-release \

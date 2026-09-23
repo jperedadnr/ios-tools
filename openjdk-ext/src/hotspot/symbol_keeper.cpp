@@ -1,3 +1,5 @@
+#include "jimage.hpp"
+
 extern void* JDK_Canonicalize;
 extern void* Java_java_lang_reflect_Array_get;
 extern void* Java_java_lang_reflect_Array_getBoolean;
@@ -378,7 +380,6 @@ extern void* Java_sun_nio_fs_UnixNativeDispatcher_closedir;
 extern void* Java_sun_nio_fs_UnixNativeDispatcher_dup;
 extern void* Java_sun_nio_fs_UnixNativeDispatcher_fchmod0;
 extern void* Java_sun_nio_fs_UnixNativeDispatcher_fchmodat0;
-extern void* Java_sun_nio_fs_UnixNativeDispatcher_fchmodatNoFollowSupported0;
 extern void* Java_sun_nio_fs_UnixNativeDispatcher_fchown0;
 extern void* Java_sun_nio_fs_UnixNativeDispatcher_fdopendir;
 extern void* Java_sun_nio_fs_UnixNativeDispatcher_fgetxattr0;
@@ -460,6 +461,10 @@ extern void* Java_com_sun_glass_ui_ios_IosView__1create;
 extern void* Java_com_sun_glass_ui_ios_IosGestureSupport__1initIDs;
 extern void* Java_com_sun_glass_ui_ios_IosCursor__1set;
 
+void* duml0 = (void*)&JIMAGE_Open;
+void* duml1 = (void*)&JIMAGE_Close;
+void* duml2 = (void*)&JIMAGE_FindResource;
+void* duml3 = (void*)&JIMAGE_GetResource;
 void* duml4 = JDK_Canonicalize;
 void* l10 = Java_java_lang_reflect_Array_get;
 void* l11 = Java_java_lang_reflect_Array_getBoolean;
@@ -840,7 +845,6 @@ void* l2248 = Java_sun_nio_fs_UnixNativeDispatcher_closedir;
 void* l2249 = Java_sun_nio_fs_UnixNativeDispatcher_dup;
 void* l2250 = Java_sun_nio_fs_UnixNativeDispatcher_fchmod0;
 void* l2251 = Java_sun_nio_fs_UnixNativeDispatcher_fchmodat0;
-void* l2252 = Java_sun_nio_fs_UnixNativeDispatcher_fchmodatNoFollowSupported0;
 void* l2253 = Java_sun_nio_fs_UnixNativeDispatcher_fchown0;
 void* l2254 = Java_sun_nio_fs_UnixNativeDispatcher_fdopendir;
 void* l2255 = Java_sun_nio_fs_UnixNativeDispatcher_fgetxattr0;
